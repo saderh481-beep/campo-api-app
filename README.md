@@ -1,29 +1,49 @@
-# API App - Documentación de Endpoints
+# API App - Documentacion de Endpoints
 
-Esta API proporciona endpoints para la aplicación móvil y servicios de backend.
+Esta API proporciona endpoints para la aplicacion movil y servicios de backend.
 
-## Autenticación
+## Autenticacion
 
-Todas las rutas (excepto `/auth/*`) requieren autenticación mediante JWT en el header:
-```
+Rutas publicas:
+- GET /health
+- POST /auth/tecnico
+
+El resto de rutas requiere JWT en el header Authorization:
+
+```txt
 Authorization: Bearer <token>
 ```
 
 ## Endpoints
 
-### Auth (`/auth`)
+### Health
 
-#### POST `/tecnico`
-Autentica a un técnico usando su código de acceso.
+#### GET /health
 
-**Body:**
+Respuesta 200:
+
 ```json
 {
-  "codigo": "string (5 caracteres)"
+  "status": "ok",
+  "service": "api-app",
+  "ts": "2026-03-23T00:00:00.000Z"
 }
 ```
 
-**Respuesta Exitosa (200):**
+### Auth
+
+#### POST /auth/tecnico
+
+Body:
+
+```json
+{
+  "codigo": "ABCDE"
+}
+```
+
+Respuesta 200:
+
 ```json
 {
   "token": "jwt_token",
@@ -34,252 +54,31 @@ Autentica a un técnico usando su código de acceso.
 }
 ```
 
-**Errores:**
-- 401: Código inválido o expirado
-- 401: Técnico no encontrado o inactivo
+Errores:
+- 401: Codigo invalido o expirado
+- 401: Tecnico no encontrado o inactivo
 
-### Bitácoras (`/bitacoras`)
+### Datos
 
-Todas las rutas requieren autenticación de técnico.
+Nota: estas rutas estan montadas en la raiz.
 
-#### GET `/`
-Obtiene las bitácoras del técnico autenticado para el mes actual.
+#### GET /mis-beneficiarios
 
-**Respuesta Exitosa (200):**
-```json
-[
-  {
-    "id": "uuid",
-    "tipo": "string (beneficiario|actividad)",
-    "estado": "string",
-    "fecha_inicio": "timestamp",
-    "fecha_fin": "timestamp (nullable)",
-    "sync_id": "uuid (nullable)"
-  }
-]
-```
+Respuesta 200:
 
-#### GET `/:id`
-Obtiene una bitácora específica por ID.
-
-**Parámetros:**
-- `id`: UUID de la bitácora
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "tipo": "string",
-  "tecnico_id": "uuid",
-  "beneficiario_id": "uuid (nullable)",
-  "cadena_productiva_id": "uuid (nullable)",
-  "actividad_id": "uuid (nullable)",
-  "fecha_inicio": "timestamp",
-  "fecha_fin": "timestamp (nullable)",
-  "coord_inicio": "point (nullable)",
-  "coord_fin": "point (nullable)",
-  "actividades_desc": "string",
-  "recomendaciones": "string (nullable)",
-  "comentarios_beneficiario": "string (nullable)",
-  "coordinacion_interinst": "boolean",
-  "instancia_coordinada": "string (nullable)",
-  "proposito_coordinacion": "string (nullable)",
-  "observaciones_coordinador": "string (nullable)",
-  "foto_rostro_url": "string (nullable)",
-  "firma_url": "string (nullable)",
-  "fotos_campo": "string[]",
-  "estado": "string",
-  "pdf_version": "smallint",
-  "pdf_url_actual": "string (nullable)",
-  "pdf_original_url": "string (nullable)",
-  "creada_offline": "boolean",
-  "sync_id": "uuid (nullable)",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-**Errores:**
-- 404: Bitácora no encontrada
-
-#### POST `/`
-Crea una nueva bitácora.
-
-**Body (Tipo Beneficiario):**
-```json
-{
-  "tipo": "beneficiario",
-  "beneficiario_id": "uuid",
-  "cadena_productiva_id": "uuid",
-  "fecha_inicio": "datetime",
-  "coord_inicio": "string (opcional)",
-  "sync_id": "string (opcional)"
-}
-```
-
-**Body (Tipo Actividad):**
-```json
-{
-  "tipo": "actividad",
-  "actividad_id": "uuid",
-  "fecha_inicio": "datetime",
-  "coord_inicio": "string (opcional)",
-  "sync_id": "string (opcional)"
-}
-```
-
-**Respuesta Exitosa (201):**
-```json
-{
-  "id": "uuid",
-  "tipo": "string",
-  "estado": "string",
-  "fecha_inicio": "timestamp",
-  "sync_id": "uuid (nullable)"
-}
-```
-
-**Errores:**
-- 400: Bitácora duplicada (si se proporciona sync_id y ya existe)
-
-#### PATCH `/:id`
-Actualiza una bitácora en estado borrador.
-
-**Body:**
-```json
-{
-  "observaciones": "string (opcional)",
-  "actividades_realizadas": "string (opcional)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "tipo": "string",
-  "estado": "string",
-  "observaciones": "string",
-  "actividades_realizadas": "string"
-}
-```
-
-**Errores:**
-- 404: Bitácora no encontrada
-- 400: Solo se pueden editar borradores
-
-#### POST `/:id/foto-rostro`
-Sube una foto de rostro para la bitácora.
-
-**Body (FormData):**
-- `foto`: archivo de imagen
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "foto_rostro_url": "string"
-}
-```
-
-**Errores:**
-- 404: Bitácora no encontrada
-- 400: Foto requerida y debe ser un archivo
-
-#### POST `/:id/firma`
-Sube una firma para la bitácora.
-
-**Body (FormData):**
-- `firma`: archivo de imagen
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "firma_url": "string"
-}
-```
-
-**Errores:**
-- 404: Bitácora no encontrada
-- 400: Firma requerida y debe ser un archivo
-
-#### POST `/:id/fotos-campo`
-Sube fotos de campo para la bitácora (máximo 10).
-
-**Body (FormData):**
-- `fotos`: array de archivos de imagen
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "fotos_campo": "string[]"
-}
-```
-
-**Errores:**
-- 404: Bitácora no encontrada
-- 400: Se requiere al menos una foto como archivo
-- 400: Máximo 10 fotos por bitácora
-
-#### POST `/:id/cerrar`
-Cierra una bitácora y genera su PDF.
-
-**Body:**
-```json
-{
-  "fecha_fin": "datetime",
-  "coord_fin": "string (opcional)"
-}
-```
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "id": "uuid",
-  "estado": "cerrada",
-  "pdf_url": "string"
-}
-```
-
-**Errores:**
-- 404: Bitácora no encontrada
-- 400: La bitácora ya está cerrada
-
-#### DELETE `/:id`
-Elimina una bitácora en estado borrador (solo si fue creada hoy).
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "message": "Bitácora eliminada"
-}
-```
-
-**Errores:**
-- 404: Bitácora no encontrada
-- 400: Solo se pueden eliminar borradores
-- 400: Solo se pueden eliminar borradores creados hoy
-
-### Datos (`/datos`)
-
-Todas las rutas requieren autenticación de técnico.
-
-#### GET `/mis-beneficiarios`
-Obtiene la lista de beneficiarios asignados al técnico.
-
-**Respuesta Exitosa (200):**
 ```json
 [
   {
     "id": "uuid",
     "nombre": "string",
     "municipio": "string",
-    "localidad": "string (nullable)",
-    "direccion": "string (nullable)",
-    "cp": "string (nullable)",
-    "telefono_principal": "bytea (nullable)",
-    "telefono_secundario": "bytea (nullable)",
-    "coord_parcela": "point (nullable)",
-    "activo": "boolean",
+    "localidad": "string|null",
+    "direccion": "string|null",
+    "cp": "string|null",
+    "telefono_principal": "bytea|null",
+    "telefono_secundario": "bytea|null",
+    "coord_parcela": "point|null",
+    "activo": true,
     "cadenas": [
       {
         "id": "uuid",
@@ -290,17 +89,17 @@ Obtiene la lista de beneficiarios asignados al técnico.
 ]
 ```
 
-#### GET `/mis-actividades`
-Obtiene la lista de actividades asignadas al técnico.
+#### GET /mis-actividades
 
-**Respuesta Exitosa (200):**
+Respuesta 200:
+
 ```json
 [
   {
     "id": "uuid",
     "nombre": "string",
-    "descripcion": "string (nullable)",
-    "activo": "boolean",
+    "descripcion": "string|null",
+    "activo": true,
     "created_by": "uuid",
     "created_at": "timestamp",
     "updated_at": "timestamp"
@@ -308,17 +107,17 @@ Obtiene la lista de actividades asignadas al técnico.
 ]
 ```
 
-#### GET `/cadenas-productivas`
-Obtiene la lista de cadenas productivas activas (con caché de 24h).
+#### GET /cadenas-productivas
 
-**Respuesta Exitosa (200):**
+Respuesta 200:
+
 ```json
 [
   {
     "id": "uuid",
     "nombre": "string",
-    "descripcion": "string (nullable)",
-    "activo": "boolean",
+    "descripcion": "string|null",
+    "activo": true,
     "created_by": "uuid",
     "created_at": "timestamp",
     "updated_at": "timestamp"
@@ -326,14 +125,219 @@ Obtiene la lista de cadenas productivas activas (con caché de 24h).
 ]
 ```
 
-### Notificaciones (`/notificaciones`)
+### Bitacoras
 
-Todas las rutas requieren autenticación de técnico.
+#### GET /bitacoras
 
-#### GET `/`
-Obtiene las notificaciones no leídas del técnico.
+Obtiene las bitacoras del tecnico autenticado para el mes actual.
 
-**Respuesta Exitosa (200):**
+Respuesta 200:
+
+```json
+[
+  {
+    "id": "uuid",
+    "tipo": "beneficiario|actividad",
+    "estado": "borrador|cerrada|...",
+    "fecha_inicio": "timestamp",
+    "fecha_fin": "timestamp|null",
+    "sync_id": "uuid|null"
+  }
+]
+```
+
+#### GET /bitacoras/:id
+
+Respuesta 200:
+
+```json
+{
+  "id": "uuid",
+  "tipo": "beneficiario|actividad",
+  "tecnico_id": "uuid",
+  "beneficiario_id": "uuid|null",
+  "cadena_productiva_id": "uuid|null",
+  "actividad_id": "uuid|null",
+  "fecha_inicio": "timestamp",
+  "fecha_fin": "timestamp|null",
+  "coord_inicio": "point|null",
+  "coord_fin": "point|null",
+  "actividades_desc": "string",
+  "recomendaciones": "string|null",
+  "comentarios_beneficiario": "string|null",
+  "coordinacion_interinst": "boolean",
+  "instancia_coordinada": "string|null",
+  "proposito_coordinacion": "string|null",
+  "observaciones_coordinador": "string|null",
+  "foto_rostro_url": "string|null",
+  "firma_url": "string|null",
+  "fotos_campo": ["string"],
+  "estado": "string",
+  "pdf_version": "number",
+  "pdf_url_actual": "string|null",
+  "pdf_original_url": "string|null",
+  "creada_offline": "boolean",
+  "sync_id": "uuid|null",
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+```
+
+Errores:
+- 404: Bitacora no encontrada
+
+#### POST /bitacoras
+
+Body tipo beneficiario:
+
+```json
+{
+  "tipo": "beneficiario",
+  "beneficiario_id": "uuid",
+  "cadena_productiva_id": "uuid",
+  "fecha_inicio": "2026-03-23T10:00:00Z",
+  "coord_inicio": "(x,y)",
+  "sync_id": "uuid-opcional"
+}
+```
+
+Body tipo actividad:
+
+```json
+{
+  "tipo": "actividad",
+  "actividad_id": "uuid",
+  "fecha_inicio": "2026-03-23T10:00:00Z",
+  "coord_inicio": "(x,y)",
+  "sync_id": "uuid-opcional"
+}
+```
+
+Respuesta 201:
+
+```json
+{
+  "id": "uuid",
+  "tipo": "string",
+  "estado": "borrador",
+  "fecha_inicio": "timestamp",
+  "sync_id": "uuid|null"
+}
+```
+
+Si el sync_id ya existe, responde con el id existente y duplicado true.
+
+#### PATCH /bitacoras/:id
+
+Actualiza solo bitacoras en estado borrador.
+
+Body:
+
+```json
+{
+  "observaciones_coordinador": "string-opcional",
+  "actividades_desc": "string-opcional"
+}
+```
+
+Respuesta 200:
+
+```json
+{
+  "id": "uuid",
+  "tipo": "string",
+  "estado": "borrador",
+  "observaciones_coordinador": "string|null",
+  "actividades_desc": "string"
+}
+```
+
+Errores:
+- 404: Bitacora no encontrada
+- 400: Solo se pueden editar borradores
+
+#### POST /bitacoras/:id/foto-rostro
+
+FormData:
+- foto: archivo
+
+Respuesta 200:
+
+```json
+{
+  "foto_rostro_url": "string"
+}
+```
+
+#### POST /bitacoras/:id/firma
+
+FormData:
+- firma: archivo
+
+Respuesta 200:
+
+```json
+{
+  "firma_url": "string"
+}
+```
+
+#### POST /bitacoras/:id/fotos-campo
+
+FormData:
+- fotos: arreglo de archivos (maximo 10 por bitacora)
+
+Respuesta 200:
+
+```json
+{
+  "fotos_campo": ["string"]
+}
+```
+
+#### POST /bitacoras/:id/cerrar
+
+Body:
+
+```json
+{
+  "fecha_fin": "2026-03-23T11:00:00Z",
+  "coord_fin": "(x,y)"
+}
+```
+
+Respuesta 200:
+
+```json
+{
+  "id": "uuid",
+  "estado": "cerrada",
+  "pdf_url": "string"
+}
+```
+
+Errores:
+- 404: Bitacora no encontrada
+- 400: La bitacora ya esta cerrada
+
+#### DELETE /bitacoras/:id
+
+Elimina bitacoras en estado borrador creadas el mismo dia.
+
+Respuesta 200:
+
+```json
+{
+  "message": "Bitacora eliminada"
+}
+```
+
+### Notificaciones
+
+#### GET /notificaciones
+
+Respuesta 200:
+
 ```json
 [
   {
@@ -343,65 +347,101 @@ Obtiene las notificaciones no leídas del técnico.
     "tipo": "string",
     "titulo": "string",
     "cuerpo": "string",
-    "leido": "boolean",
-    "enviado_push": "boolean",
-    "enviado_email": "boolean",
-    "creado_en": "timestamp"
+    "leido": false,
+    "enviado_push": false,
+    "enviado_email": false,
+    "created_at": "timestamp"
   }
 ]
 ```
 
-#### PATCH `/:id/leer`
-Marca una notificación como leída.
+#### PATCH /notificaciones/:id/leer
 
-**Parámetros:**
-- `id`: UUID de la notificación
+Respuesta 200:
 
-**Respuesta Exitosa (200):**
 ```json
 {
-  "message": "Marcada como leída"
+  "message": "Marcada como leida"
 }
 ```
 
-### Sync (`/sync`)
+### Sync
 
-#### GET `/`
-Obtiene el estado de sincronización.
+#### POST /sync
 
-**Respuesta Exitosa (200):**
+Procesa operaciones offline ordenadas por timestamp.
+
+Body:
+
 ```json
 {
-  "last_sync": "timestamp (nullable)",
-  "pending_uploads": "integer",
-  "pending_downloads": "integer"
+  "operaciones": [
+    {
+      "operacion": "crear_bitacora",
+      "timestamp": "2026-03-23T10:00:00Z",
+      "payload": {
+        "tipo": "actividad",
+        "actividad_id": "uuid",
+        "fecha_inicio": "2026-03-23T10:00:00Z",
+        "coord_inicio": "(x,y)",
+        "sync_id": "uuid"
+      }
+    }
+  ]
 }
 ```
 
-#### POST `/upload`
-Sube datos pendientes de sincronización.
+Respuesta 200:
 
-**Body:**
 ```json
 {
-  "data": "object"
+  "procesadas": 1,
+  "resultados": [
+    {
+      "sync_id": "uuid",
+      "operacion": "crear_bitacora",
+      "exito": true
+    }
+  ]
 }
 ```
 
-**Respuesta Exitosa (200):**
+Nota: actualmente solo crear_bitacora esta implementada; cerrar_bitacora y editar_bitacora regresan exito false con mensaje.
+
+#### GET /sync/delta?ultimo_sync=<ISO-8601>
+
+Respuesta 200:
+
 ```json
 {
-  "message": "Datos subidos exitosamente",
-  "uploaded": "integer"
+  "sync_ts": "timestamp",
+  "beneficiarios": [
+    {
+      "id": "uuid",
+      "nombre": "string",
+      "municipio": "string",
+      "localidad": "string|null",
+      "updated_at": "timestamp"
+    }
+  ],
+  "actividades": [
+    {
+      "id": "uuid",
+      "nombre": "string",
+      "descripcion": "string|null",
+      "updated_at": "timestamp"
+    }
+  ],
+  "cadenas": [
+    {
+      "id": "uuid",
+      "nombre": "string",
+      "descripcion": "string|null",
+      "updated_at": "timestamp"
+    }
+  ]
 }
 ```
 
-#### POST `/download`
-Descarga datos pendientes de sincronización.
-
-**Respuesta Exitosa (200):**
-```json
-{
-  "data": "object",
-  "timestamp": "timestamp"
-}
+Error 400:
+- Formato de fecha invalido en ultimo_sync
