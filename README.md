@@ -1,18 +1,34 @@
 # API App - Documentacion de Endpoints
 
-Esta API proporciona endpoints para la aplicacion movil y servicios de backend.
+Esta API proporciona endpoints para la aplicacion movil de tecnicos y servicios de backend para trabajo online/offline.
+
+## Flujo funcional esperado
+
+1. El tecnico inicia sesion con codigo de acceso de 5 digitos.
+2. Descarga sus beneficiarios y actividades asignadas.
+3. Crea y llena bitacoras con evidencias, en linea o fuera de linea.
+4. Cierra bitacoras.
+5. Si hay internet, sincroniza bitacoras y evidencias con los servicios correspondientes.
+6. La sesion autenticada se guarda en Redis.
 
 ## Autenticacion
 
 Rutas publicas:
+
 - GET /health
 - POST /auth/tecnico
 
-El resto de rutas requiere JWT en el header Authorization:
+El resto de rutas requiere token en el header Authorization:
 
 ```txt
 Authorization: Bearer <token>
 ```
+
+Detalles de sesion:
+
+- La sesion se guarda en Redis con clave session:{token}.
+- Si la sesion no existe o expira, responde 401.
+- Si el tecnico esta en periodo vencido o corte aplicado, responde 401 con error periodo_vencido.
 
 ## Endpoints
 
@@ -34,11 +50,17 @@ Respuesta 200:
 
 #### POST /auth/tecnico
 
+Validaciones:
+
+- codigo debe ser numerico de 5 digitos.
+- Tecnico debe existir y estar activo.
+- Si fecha_limite ya vencio o estado_corte es distinto de en_servicio, responde 401 con error periodo_vencido.
+
 Body:
 
 ```json
 {
-  "codigo": "ABCDE"
+  "codigo": "12345"
 }
 ```
 
@@ -55,8 +77,10 @@ Respuesta 200:
 ```
 
 Errores:
+
 - 401: Codigo invalido o expirado
 - 401: Tecnico no encontrado o inactivo
+- 401: periodo_vencido
 
 ### Datos
 
@@ -184,6 +208,7 @@ Respuesta 200:
 ```
 
 Errores:
+
 - 404: Bitacora no encontrada
 
 #### POST /bitacoras
@@ -253,12 +278,14 @@ Respuesta 200:
 ```
 
 Errores:
+
 - 404: Bitacora no encontrada
 - 400: Solo se pueden editar borradores
 
 #### POST /bitacoras/:id/foto-rostro
 
 FormData:
+
 - foto: archivo
 
 Respuesta 200:
@@ -272,6 +299,7 @@ Respuesta 200:
 #### POST /bitacoras/:id/firma
 
 FormData:
+
 - firma: archivo
 
 Respuesta 200:
@@ -285,6 +313,7 @@ Respuesta 200:
 #### POST /bitacoras/:id/fotos-campo
 
 FormData:
+
 - fotos: arreglo de archivos (maximo 10 por bitacora)
 
 Respuesta 200:
@@ -317,6 +346,7 @@ Respuesta 200:
 ```
 
 Errores:
+
 - 404: Bitacora no encontrada
 - 400: La bitacora ya esta cerrada
 
@@ -408,7 +438,7 @@ Respuesta 200:
 
 Nota: actualmente solo crear_bitacora esta implementada; cerrar_bitacora y editar_bitacora regresan exito false con mensaje.
 
-#### GET /sync/delta?ultimo_sync=<ISO-8601>
+#### GET /sync/delta?ultimo_sync=ISO-8601
 
 Respuesta 200:
 
@@ -444,4 +474,5 @@ Respuesta 200:
 ```
 
 Error 400:
+
 - Formato de fecha invalido en ultimo_sync
