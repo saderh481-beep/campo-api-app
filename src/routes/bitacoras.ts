@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { sql } from "@/db";
 import { authMiddleware } from "@/middleware/auth";
 import {
@@ -9,9 +10,14 @@ import {
   subirFotoCampo,
   subirPdfBitacora,
 } from "@/lib/cloudinary";
+import type { JwtPayload } from "@/lib/jwt";
 import { generarPdfBitacora } from "@/lib/pdf";
 
-const app = new Hono();
+const app = new Hono<{
+  Variables: {
+    tecnico: JwtPayload
+  }
+}>();
 app.use("*", authMiddleware);
 
 const schemaBitacoraTipoA = z.object({
@@ -88,8 +94,8 @@ app.patch(
   zValidator(
     "json",
     z.object({
-      observaciones: z.string().optional(),
-      actividades_realizadas: z.string().optional(),
+      observaciones_coordinador: z.string().optional(),
+      actividades_desc: z.string().optional(),
     })
   ),
   async (c) => {
@@ -107,11 +113,11 @@ app.patch(
 
     const [actualizada] = await sql`
       UPDATE bitacoras SET
-        observaciones          = COALESCE(${body.observaciones ?? null}, observaciones),
-        actividades_realizadas = COALESCE(${body.actividades_realizadas ?? null}, actividades_realizadas),
-        actualizado_en         = NOW()
+        observaciones_coordinador = COALESCE(${body.observaciones_coordinador ?? null}, observaciones_coordinador),
+        actividades_desc          = COALESCE(${body.actividades_desc ?? null}, actividades_desc),
+        updated_at                = NOW()
       WHERE id = ${id}
-      RETURNING id, tipo, estado, observaciones, actividades_realizadas
+      RETURNING id, tipo, estado, observaciones_coordinador, actividades_desc
     `;
     return c.json(actualizada);
   }
@@ -133,7 +139,7 @@ app.post("/:id/foto-rostro", async (c) => {
   const buffer = Buffer.from(await archivo.arrayBuffer());
   const { secure_url } = await subirFotoRostro(buffer, id);
 
-  await sql`UPDATE bitacoras SET foto_rostro_url = ${secure_url}, actualizado_en = NOW() WHERE id = ${id}`;
+  await sql`UPDATE bitacoras SET foto_rostro_url = ${secure_url}, updated_at = NOW() WHERE id = ${id}`;
   return c.json({ foto_rostro_url: secure_url });
 });
 
@@ -153,7 +159,7 @@ app.post("/:id/firma", async (c) => {
   const buffer = Buffer.from(await archivo.arrayBuffer());
   const { secure_url } = await subirFirma(buffer, id);
 
-  await sql`UPDATE bitacoras SET firma_url = ${secure_url}, actualizado_en = NOW() WHERE id = ${id}`;
+  await sql`UPDATE bitacoras SET firma_url = ${secure_url}, updated_at = NOW() WHERE id = ${id}`;
   return c.json({ firma_url: secure_url });
 });
 
@@ -187,7 +193,7 @@ app.post("/:id/fotos-campo", async (c) => {
 
   const todasLasUrls = [...existentes, ...nuevasUrls];
   await sql`
-    UPDATE bitacoras SET fotos_campo = ${JSON.stringify(todasLasUrls)}, actualizado_en = NOW() WHERE id = ${id}
+    UPDATE bitacoras SET fotos_campo = ${JSON.stringify(todasLasUrls)}, updated_at = NOW() WHERE id = ${id}
   `;
   return c.json({ fotos_campo: todasLasUrls });
 });
@@ -213,22 +219,33 @@ app.post(
 
     const [cerrada] = await sql`
       UPDATE bitacoras SET
-        estado     = 'cerrada',
-        fecha_fin  = ${body.fecha_fin},
-        coord_fin  = ${body.coord_fin ?? null},
-        actualizado_en = NOW()
+        estado = 'cerrada',
+        fecha_fin = ${body.fecha_fin},
+        coord_fin = ${body.coord_fin ?? null},
+        updated_at = NOW()
       WHERE id = ${id}
       RETURNING *
     `;
 
     const pdfBytes = await generarPdfBitacora(cerrada);
     const buffer = Buffer.from(pdfBytes);
+    const sha256 = createHash("sha256").update(buffer).digest("hex");
     const mes = new Date(cerrada.fecha_inicio).getMonth() + 1;
     const { secure_url } = await subirPdfBitacora(buffer, tecnico.sub, mes, id);
+    const nuevaVersion = Number(cerrada.pdf_version ?? 0) + 1;
 
     await sql`
-      INSERT INTO pdf_versiones (bitacora_id, url, generado_en)
-      VALUES (${id}, ${secure_url}, NOW())
+      UPDATE bitacoras
+      SET pdf_version = ${nuevaVersion},
+          pdf_url_actual = ${secure_url},
+          pdf_original_url = COALESCE(pdf_original_url, ${secure_url}),
+          updated_at = NOW()
+      WHERE id = ${id}
+    `;
+
+    await sql`
+      INSERT INTO pdf_versiones (bitacora_id, version, r2_key, sha256, inmutable, generado_por)
+      VALUES (${id}, ${nuevaVersion}, ${secure_url}, ${sha256}, false, ${tecnico.sub})
     `;
 
     return c.json({ id, estado: "cerrada", pdf_url: secure_url });
@@ -240,7 +257,7 @@ app.delete("/:id", async (c) => {
   const { id } = c.req.param();
 
   const [bitacora] = await sql`
-    SELECT id, estado, creado_en FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}
+    SELECT id, estado, created_at FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}
   `;
   if (!bitacora) return c.json({ error: "Bitácora no encontrada" }, 404);
   if (bitacora.estado !== "borrador") {
@@ -248,7 +265,7 @@ app.delete("/:id", async (c) => {
   }
 
   const hoy = new Date().toDateString();
-  const creadoHoy = new Date(bitacora.creado_en).toDateString() === hoy;
+  const creadoHoy = new Date(bitacora.created_at).toDateString() === hoy;
   if (!creadoHoy) {
     return c.json({ error: "Solo se pueden eliminar borradores creados hoy" }, 400);
   }

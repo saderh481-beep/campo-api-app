@@ -30,8 +30,8 @@ export async function generarPdfBitacora(bitacora: Bitacora): Promise<Uint8Array
     ["Estado", bitacora.estado],
     ["Fecha inicio", bitacora.fecha_inicio],
     ["Fecha fin", bitacora.fecha_fin ?? "—"],
-    ["Observaciones", bitacora.observaciones ?? "—"],
-    ["Actividades realizadas", bitacora.actividades_realizadas ?? "—"],
+    ["Observaciones", bitacora.observaciones_coordinador ?? "—"],
+    ["Actividades realizadas", bitacora.actividades_desc ?? "—"],
     ["Coordenadas inicio", bitacora.coord_inicio ?? "—"],
     ["Coordenadas fin", bitacora.coord_fin ?? "—"],
   ];

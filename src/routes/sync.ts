@@ -3,8 +3,13 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { sql } from "@/db";
 import { authMiddleware } from "@/middleware/auth";
+import type { JwtPayload } from "@/lib/jwt";
 
-const app = new Hono();
+const app = new Hono<{
+  Variables: {
+    tecnico: JwtPayload
+  }
+}>();
 app.use("*", authMiddleware);
 
 const schemaBitacoraTipoA = z.object({
@@ -92,25 +97,25 @@ app.get("/sync/delta", async (c) => {
 
   const [beneficiarios, actividades, cadenas] = await Promise.all([
     sql`
-      SELECT DISTINCT b.id, b.nombre, b.curp, b.municipio, b.actualizado_en
+      SELECT DISTINCT b.id, b.nombre, b.municipio, b.localidad, b.updated_at
       FROM beneficiarios b
       JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
       WHERE ab.tecnico_id = ${tecnico.sub}
         AND ab.activo = true
-        AND b.actualizado_en > ${desde.toISOString()}
+        AND b.updated_at > ${desde.toISOString()}
     `,
     sql`
-      SELECT a.id, a.nombre, a.descripcion, a.actualizado_en
+      SELECT a.id, a.nombre, a.descripcion, a.updated_at
       FROM actividades a
       JOIN asignaciones_actividad aa ON aa.actividad_id = a.id
       WHERE aa.tecnico_id = ${tecnico.sub}
         AND aa.activo = true
-        AND a.actualizado_en > ${desde.toISOString()}
+        AND a.updated_at > ${desde.toISOString()}
     `,
     sql`
-      SELECT id, nombre, descripcion, actualizado_en
+      SELECT id, nombre, descripcion, updated_at
       FROM cadenas_productivas
-      WHERE activo = true AND actualizado_en > ${desde.toISOString()}
+      WHERE activo = true AND updated_at > ${desde.toISOString()}
     `,
   ]);
 

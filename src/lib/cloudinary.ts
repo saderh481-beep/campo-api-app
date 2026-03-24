@@ -1,4 +1,4 @@
-import { v2 as cloudinary } from "cloudinary";
+import { v2 as cloudinary, type UploadApiOptions } from "cloudinary";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
@@ -8,7 +8,7 @@ cloudinary.config({
 
 function upload(
   buffer: Buffer,
-  options: Parameters<typeof cloudinary.uploader.upload_stream>[0]
+  options: UploadApiOptions
 ): Promise<{ secure_url: string; public_id: string }> {
   return new Promise((resolve, reject) => {
     cloudinary.uploader

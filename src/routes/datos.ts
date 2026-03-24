@@ -24,7 +24,7 @@ app.get("/mis-beneficiarios", async (c) => {
     FROM asignaciones_beneficiario ab
     JOIN beneficiarios b ON b.id = ab.beneficiario_id
     LEFT JOIN beneficiario_cadenas bc ON bc.beneficiario_id = b.id
-    LEFT JOIN cadenas_productivas cp ON cp.id = bc.cadena_productiva_id
+    LEFT JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
     WHERE ab.tecnico_id = ${tecnico.sub} AND ab.activo = true
     GROUP BY b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp, 
              b.telefono_principal, b.telefono_secundario, b.coord_parcela, b.activo
