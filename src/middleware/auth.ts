@@ -32,7 +32,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const tecnico = c.get("tecnico");
   const [tecnicoActual] = await sql`
     SELECT activo, fecha_limite, estado_corte
-    FROM tecnicos
+    FROM usuarios
     WHERE id = ${tecnico.sub}
     LIMIT 1
   `;

@@ -18,7 +18,7 @@ app.post(
 
     const [tecnico] = await sql`
       SELECT id, nombre, correo, activo, fecha_limite, estado_corte
-      FROM tecnicos
+      FROM usuarios
       WHERE codigo_acceso = ${codigo} AND activo = true
       LIMIT 1
     `;

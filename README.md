@@ -29,6 +29,7 @@ Detalles de sesion:
 - La sesion se guarda en Redis con clave session:{token}.
 - Si la sesion no existe o expira, responde 401.
 - Si el tecnico esta en periodo vencido o corte aplicado, responde 401 con error periodo_vencido.
+- Los datos del tecnico (autenticacion y validacion de sesion) se obtienen de la tabla usuarios.
 
 ## Endpoints
 
@@ -53,7 +54,7 @@ Respuesta 200:
 Validaciones:
 
 - codigo debe ser numerico de 5 digitos.
-- Tecnico debe existir y estar activo.
+- El usuario debe existir en la tabla usuarios y estar activo.
 - Si fecha_limite ya vencio o estado_corte es distinto de en_servicio, responde 401 con error periodo_vencido.
 
 Body:
