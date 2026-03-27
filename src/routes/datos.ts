@@ -14,20 +14,21 @@ app.use("*", authMiddleware);
 app.get("/mis-beneficiarios", async (c) => {
   const tecnico = c.get("tecnico");
   const beneficiarios = await sql`
-    SELECT b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp, 
+    SELECT b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
            b.telefono_principal, b.telefono_secundario, b.coord_parcela, b.activo,
-            COALESCE(
-              json_agg(json_build_object('id', cp.id, 'nombre', cp.nombre))
-              FILTER (WHERE cp.id IS NOT NULL),
-              '[]'
-            ) AS cadenas
+           COALESCE((
+             SELECT json_agg(json_build_object('id', cp.id, 'nombre', cp.nombre) ORDER BY cp.nombre)
+             FROM beneficiario_cadenas bc
+             JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
+             WHERE bc.beneficiario_id = b.id
+               AND bc.activo = true
+               AND cp.activo = true
+           ), '[]'::json) AS cadenas
     FROM asignaciones_beneficiario ab
     JOIN beneficiarios b ON b.id = ab.beneficiario_id
-    LEFT JOIN beneficiario_cadenas bc ON bc.beneficiario_id = b.id
-    LEFT JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
-    WHERE ab.tecnico_id = ${tecnico.sub} AND ab.activo = true
-    GROUP BY b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp, 
-             b.telefono_principal, b.telefono_secundario, b.coord_parcela, b.activo
+    WHERE ab.tecnico_id = ${tecnico.sub}
+      AND ab.activo = true
+      AND b.activo = true
     ORDER BY b.nombre
   `;
   return c.json(beneficiarios);
