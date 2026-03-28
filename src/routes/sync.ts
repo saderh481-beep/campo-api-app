@@ -15,7 +15,7 @@ app.use("*", authMiddleware);
 const schemaBitacoraTipoA = z.object({
   tipo: z.literal("beneficiario"),
   beneficiario_id: z.string().uuid(),
-  cadena_productiva_id: z.string().uuid(),
+  cadena_productiva_id: z.string().uuid().optional(),
   fecha_inicio: z.string().datetime(),
   coord_inicio: z.string().optional(),
   sync_id: z.string(),

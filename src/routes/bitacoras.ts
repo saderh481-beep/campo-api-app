@@ -23,7 +23,7 @@ app.use("*", authMiddleware);
 const schemaBitacoraTipoA = z.object({
   tipo: z.literal("beneficiario"),
   beneficiario_id: z.string().uuid(),
-  cadena_productiva_id: z.string().uuid(),
+  cadena_productiva_id: z.string().uuid().optional(),
   fecha_inicio: z.string().datetime(),
   coord_inicio: z.string().optional(),
   sync_id: z.string().optional(),
@@ -57,7 +57,7 @@ app.post("/", zValidator("json", schemaBitacora), async (c) => {
       ${("coord_inicio" in body ? body.coord_inicio : null) ?? null},
       ${("sync_id" in body ? body.sync_id : null) ?? null},
       ${"beneficiario_id" in body ? body.beneficiario_id : null},
-      ${"cadena_productiva_id" in body ? body.cadena_productiva_id : null},
+      ${body.tipo === "beneficiario" ? body.cadena_productiva_id ?? null : null},
       ${"actividad_id" in body ? body.actividad_id : null}
     )
     RETURNING id, tipo, estado, fecha_inicio, sync_id
@@ -96,6 +96,12 @@ app.patch(
     z.object({
       observaciones_coordinador: z.string().optional(),
       actividades_desc: z.string().optional(),
+      coord_inicio: z.string().optional(),
+      coord_fin: z.string().optional(),
+      fecha_inicio: z.string().datetime().optional(),
+      fecha_fin: z.string().datetime().optional(),
+      recomendaciones: z.string().optional(),
+      comentarios_beneficiario: z.string().optional(),
     })
   ),
   async (c) => {
@@ -115,9 +121,26 @@ app.patch(
       UPDATE bitacoras SET
         observaciones_coordinador = COALESCE(${body.observaciones_coordinador ?? null}, observaciones_coordinador),
         actividades_desc          = COALESCE(${body.actividades_desc ?? null}, actividades_desc),
+        coord_inicio              = COALESCE(${body.coord_inicio ?? null}, coord_inicio),
+        coord_fin                 = COALESCE(${body.coord_fin ?? null}, coord_fin),
+        fecha_inicio              = COALESCE(${body.fecha_inicio ?? null}, fecha_inicio),
+        fecha_fin                 = COALESCE(${body.fecha_fin ?? null}, fecha_fin),
+        recomendaciones           = COALESCE(${body.recomendaciones ?? null}, recomendaciones),
+        comentarios_beneficiario  = COALESCE(${body.comentarios_beneficiario ?? null}, comentarios_beneficiario),
         updated_at                = NOW()
       WHERE id = ${id}
-      RETURNING id, tipo, estado, observaciones_coordinador, actividades_desc
+      RETURNING
+        id,
+        tipo,
+        estado,
+        fecha_inicio,
+        fecha_fin,
+        coord_inicio,
+        coord_fin,
+        observaciones_coordinador,
+        actividades_desc,
+        recomendaciones,
+        comentarios_beneficiario
     `;
     return c.json(actualizada);
   }
