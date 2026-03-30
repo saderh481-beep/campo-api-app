@@ -21,10 +21,15 @@ function sanitizeRedisUrl(url: string): string {
   return url;
 }
 
-export const redis = new Redis(process.env.REDIS_URL || 'redis://default:SdekIELQIOJNBXLIUXHgDfHQhfqSwgqU@mainline.proxy.rlwy.net:26908', {
+const rawRedisUrl = process.env.REDIS_URL || 'redis://default:SdekIELQIOJNBXLIUXHgDfHQhfqSwgqU@mainline.proxy.rlwy.net:26908';
+const cleanRedisUrl = sanitizeRedisUrl(rawRedisUrl);
+console.log('[Redis] Using URL:', cleanRedisUrl);
+
+export const redis = new Redis(cleanRedisUrl, {
   maxRetriesPerRequest: 1,
   enableReadyCheck: false,
   lazyConnect: true,
+  db: 0
 });
 
 redis.on("error", (err) => {
