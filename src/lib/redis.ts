@@ -21,20 +21,15 @@ function sanitizeRedisUrl(url: string): string {
   return url;
 }
 
-let redisUrl: string;
-
-if (process.env.NODE_ENV === "production") {
-  redisUrl = process.env.REDIS_URL!;
-} else {
-  redisUrl = process.env.REDIS_PUBLIC_URL ?? process.env.REDIS_URL!;
-}
-
-// Sanitize the URL to handle potential duplication
-redisUrl = sanitizeRedisUrl(redisUrl);
-
-export const redis = new Redis(redisUrl, {
-  maxRetriesPerRequest: 3,
-  enableReadyCheck: true,
+export const redis = new Redis({
+  host: 'mainline.proxy.rlwy.net',
+  port: 26908,
+  username: 'default',
+  password: 'SdekIELQIOJNBXLIUXHgDfHQhfqSwgqU',
+  db: 0,
+  maxRetriesPerRequest: 1,
+  enableReadyCheck: false,
+  lazyConnect: true,
 });
 
 redis.on("error", (err) => {
