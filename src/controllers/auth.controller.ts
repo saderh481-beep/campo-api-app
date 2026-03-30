@@ -27,8 +27,8 @@ app.post(
     const resultado = await loginTecnico(codigo, ip, userAgent);
 
     if (!resultado.success) {
-      const status = resultado.error === "periodo_vencido" ? 401 : 401;
-      return c.json({ error: resultado.error }, status);
+      /* TODO: [BLACKBOXAI] periodo_vencido desactivado temporalmente */
+      return c.json({ error: resultado.error }, 401);
     }
 
     return c.json({
