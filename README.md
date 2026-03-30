@@ -477,3 +477,50 @@ Respuesta 200:
 Error 400:
 
 - Formato de fecha invalido en ultimo_sync
+  
+## Scripts de Utilidad  
+  
+### Crear Coordinadores  
+  
+Script para crear 3 usuarios coordinadores con codigos de acceso de 6 digitos.  
+  
+**Ubicacion:** `scripts/crear-coordinadores.ts`  
+  
+**Uso:**  
+  
+```bash  
+bun run scripts/crear-coordinadores.ts  
+```  
+  
+**Funcionalidad:**  
+  
+- Genera 3 usuarios coordinadores con codigos aleatorios de 6 digitos  
+- Cada usuario se crea con nombre, correo y codigo de acceso unico  
+- Los usuarios se crean como activos por defecto  
+- Muestra en consola los datos de cada coordinador creado  
+  
+**Ejemplo de salida:**  
+  
+```  
+Creando 3 usuarios coordinadores...  
+  
+V Coordinador creado exitosamente:  
+  ID: uuid  
+  Nombre: Coordinador 1  
+  Correo: coordinador1@ejemplo.com  
+  Codigo de acceso (6 digitos): 123456  
+  
+V Coordinador creado exitosamente:  
+  ID: uuid  
+  Nombre: Coordinador 2  
+  Correo: coordinador2@ejemplo.com  
+  Codigo de acceso (6 digitos): 789012  
+  
+V Coordinador creado exitosamente:  
+  ID: uuid  
+  Nombre: Coordinador 3  
+  Correo: coordinador3@ejemplo.com  
+  Codigo de acceso (6 digitos): 345678  
+  
+Proceso completado.  
+``` 
