@@ -41,6 +41,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
     return c.json({ error: "Token inválido o expirado" }, 401);
   }
 
+  /* TODO: [BLACKBOXAI] Desactivado temporalmente fecha global
   const fechaLimiteVencida = tecnicoActual.fecha_limite
     ? new Date(tecnicoActual.fecha_limite).getTime() < Date.now()
     : false;
@@ -49,7 +50,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   if (fechaLimiteVencida || corteAplicado) {
     await redis.del(`session:${token}`);
     return c.json({ error: "periodo_vencido" }, 401);
-  }
+  } */
 
   await next();
 });

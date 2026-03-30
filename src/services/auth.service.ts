@@ -17,6 +17,7 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
     return { success: false, error: "Código inválido o expirado" };
   }
 
+  /* TODO: [BLACKBOXAI] Desactivado temporalmente fecha global
   const fechaLimiteVencida = tecnico.fecha_limite
     ? new Date(tecnico.fecha_limite).getTime() < Date.now()
     : false;
@@ -24,7 +25,7 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
 
   if (fechaLimiteVencida || corteAplicado) {
     return { success: false, error: "periodo_vencido" };
-  }
+  } */
 
   const token = await signJwt({ sub: tecnico.id, nombre: tecnico.nombre, rol: "tecnico" });
 
