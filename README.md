@@ -1,19 +1,60 @@
-# API App - Documentacion de Endpoints
+# API App - Documentación de Endpoints
 
-Esta API proporciona endpoints para la aplicacion movil de tecnicos y servicios de backend para trabajo online/offline.
+Esta API proporciona endpoints para la aplicación móvil de técnicos y servicios de backend para trabajo online/offline.
+
+## Arquitectura
+
+La API está organizada en una arquitectura **models/controllers/services**:
+
+```
+src/
+├── app.ts                    # Configuración principal de Hono
+├── index.ts                  # Punto de entrada
+├── controllers/              # Controladores de rutas
+│   ├── auth.controller.ts
+│   ├── beneficiario.controller.ts
+│   ├── bitacora.controller.ts
+│   ├── notificacion.controller.ts
+│   ├── sync.controller.ts
+│   └── index.ts
+├── services/                 # Lógica de negocio
+│   ├── auth.service.ts
+│   ├── beneficiario.service.ts
+│   ├── bitacora.service.ts
+│   ├── notificacion.service.ts
+│   ├── sync.service.ts
+│   └── index.ts
+├── models/                   # Tipos TypeScript
+│   ├── usuario.ts
+│   ├── beneficiario.ts
+│   ├── bitacora.ts
+│   ├── asignacion.ts
+│   ├── auth-log.ts
+│   └── index.ts
+├── lib/                      # Utilidades
+│   ├── cloudinary.ts
+│   ├── jwt.ts
+│   ├── pdf.ts
+│   └── redis.ts
+├── middleware/               # Middlewares
+│   ├── auth.ts
+│   └── ratelimit.ts
+└── db/                       # Conexión a BD
+    └── index.ts
+```
 
 ## Flujo funcional esperado
 
-1. El tecnico inicia sesion con codigo de acceso de 5 digitos.
+1. El técnico inicia sesión con código de acceso de 5 dígitos.
 2. Descarga sus beneficiarios y actividades asignadas.
-3. Crea y llena bitacoras con evidencias, en linea o fuera de linea.
-4. Cierra bitacoras.
-5. Si hay internet, sincroniza bitacoras y evidencias con los servicios correspondientes.
-6. La sesion autenticada se guarda en Redis.
+3. Crea y llena bitácoras con evidencias, en línea o fuera de línea.
+4. Cierra bitácoras.
+5. Si hay internet, sincroniza bitácoras y evidencias con los servicios correspondientes.
+6. La sesión autenticada se guarda en Redis.
 
-## Autenticacion
+## Autenticación
 
-Rutas publicas:
+Rutas públicas:
 
 - GET /health
 - POST /auth/tecnico
@@ -24,12 +65,13 @@ El resto de rutas requiere token en el header Authorization:
 Authorization: Bearer <token>
 ```
 
-Detalles de sesion:
+Detalles de sesión:
 
-- La sesion se guarda en Redis con clave session:{token}.
-- Si la sesion no existe o expira, responde 401.
-- Si el tecnico esta en periodo vencido o corte aplicado, responde 401 con error periodo_vencido.
-- Los datos del tecnico (autenticacion y validacion de sesion) se obtienen de la tabla usuarios.
+- La sesión se guarda en Redis con clave session:{token}.
+- Si la sesión no existe o expira, responde 401.
+- Si el técnico está en periodo vencido o corte aplicado, responde 401 con error periodo_vencido.
+- Los datos del técnico (autenticación y validación de sesión) se obtienen de la tabla usuarios.
+- Se registran logs de autenticación en la tabla `auth_logs`.
 
 ## Endpoints
 
@@ -53,9 +95,9 @@ Respuesta 200:
 
 Validaciones:
 
-- codigo debe ser numerico de 5 digitos.
+- codigo debe ser numérico de 5 dígitos.
 - El usuario debe existir en la tabla usuarios y estar activo.
-- Si fecha_limite ya vencio o estado_corte es distinto de en_servicio, responde 401 con error periodo_vencido.
+- Si fecha_limite ya venció o estado_corte es distinto de en_servicio, responde 401 con error periodo_vencido.
 
 Body:
 
@@ -79,13 +121,25 @@ Respuesta 200:
 
 Errores:
 
-- 401: Codigo invalido o expirado
-- 401: Tecnico no encontrado o inactivo
+- 401: Código inválido o expirado
+- 401: Técnico no encontrado o inactivo
 - 401: periodo_vencido
+
+#### POST /auth/logout
+
+Cierra la sesión del técnico autenticado.
+
+Respuesta 200:
+
+```json
+{
+  "message": "Sesión cerrada"
+}
+```
 
 ### Datos
 
-Nota: estas rutas estan montadas en la raiz.
+Nota: estas rutas están montadas en la raiz.
 
 #### GET /mis-beneficiarios
 
@@ -100,9 +154,9 @@ Respuesta 200:
     "localidad": "string|null",
     "direccion": "string|null",
     "cp": "string|null",
-    "telefono_principal": "bytea|null",
-    "telefono_secundario": "bytea|null",
-    "coord_parcela": "point|null",
+    "telefono_principal": "string|null",
+    "telefono_secundario": "string|null",
+    "coord_parcela": "string|null",
     "activo": true,
     "cadenas": [
       {
@@ -112,6 +166,36 @@ Respuesta 200:
     ]
   }
 ]
+```
+
+#### POST /beneficiarios
+
+Crea un nuevo beneficiario y lo asigna automáticamente al técnico.
+
+Body:
+
+```json
+{
+  "nombre_completo": "string",
+  "municipio": "string",
+  "localidad": "string",
+  "telefono_contacto": "string",
+  "cadena_productiva": "string-optional"
+}
+```
+
+Respuesta 201:
+
+```json
+{
+  "id": "uuid",
+  "nombre": "string",
+  "municipio": "string",
+  "localidad": "string",
+  "telefono_principal": "string",
+  "activo": true,
+  "cadenas": []
+}
 ```
 
 #### GET /mis-actividades
@@ -150,11 +234,37 @@ Respuesta 200:
 ]
 ```
 
-### Bitacoras
+#### GET /localidades?municipio=string
 
-#### GET /bitacoras
+Obtiene localidades filtradas por municipio.
 
-Obtiene las bitacoras del tecnico autenticado para el mes actual.
+Respuesta 200:
+
+```json
+[
+  {
+    "id": "uuid",
+    "municipio": "string",
+    "nombre": "string",
+    "cp": "string|null",
+    "activo": true,
+    "created_by": "uuid|null",
+    "created_at": "timestamp",
+    "updated_at": "timestamp",
+    "zona_id": "uuid|null"
+  }
+]
+```
+
+### Bitácoras
+
+#### GET /bitacoras?limit=50&offset=0
+
+Obtiene las bitácoras del técnico autenticado para el mes actual con paginación.
+
+Parámetros de consulta:
+- `limit`: Número máximo de resultados (default: 50)
+- `offset`: Número de resultados a saltar (default: 0)
 
 Respuesta 200:
 
@@ -185,8 +295,8 @@ Respuesta 200:
   "actividad_id": "uuid|null",
   "fecha_inicio": "timestamp",
   "fecha_fin": "timestamp|null",
-  "coord_inicio": "point|null",
-  "coord_fin": "point|null",
+  "coord_inicio": "string|null",
+  "coord_fin": "string|null",
   "actividades_desc": "string",
   "recomendaciones": "string|null",
   "comentarios_beneficiario": "string|null",
@@ -210,7 +320,7 @@ Respuesta 200:
 
 Errores:
 
-- 404: Bitacora no encontrada
+- 404: Bitácora no encontrada
 
 #### POST /bitacoras
 
@@ -220,10 +330,10 @@ Body tipo beneficiario:
 {
   "tipo": "beneficiario",
   "beneficiario_id": "uuid",
-  "cadena_productiva_id": "uuid",
+  "cadena_productiva_id": "uuid-optional",
   "fecha_inicio": "2026-03-23T10:00:00Z",
-  "coord_inicio": "(x,y)",
-  "sync_id": "uuid-opcional"
+  "coord_inicio": "(x,y)-optional",
+  "sync_id": "uuid-optional"
 }
 ```
 
@@ -234,8 +344,8 @@ Body tipo actividad:
   "tipo": "actividad",
   "actividad_id": "uuid",
   "fecha_inicio": "2026-03-23T10:00:00Z",
-  "coord_inicio": "(x,y)",
-  "sync_id": "uuid-opcional"
+  "coord_inicio": "(x,y)-optional",
+  "sync_id": "uuid-optional"
 }
 ```
 
@@ -255,14 +365,20 @@ Si el sync_id ya existe, responde con el id existente y duplicado true.
 
 #### PATCH /bitacoras/:id
 
-Actualiza solo bitacoras en estado borrador.
+Actualiza solo bitácoras en estado borrador.
 
 Body:
 
 ```json
 {
-  "observaciones_coordinador": "string-opcional",
-  "actividades_desc": "string-opcional"
+  "observaciones_coordinador": "string-optional",
+  "actividades_desc": "string-optional",
+  "coord_inicio": "string-optional",
+  "coord_fin": "string-optional",
+  "fecha_inicio": "timestamp-optional",
+  "fecha_fin": "timestamp-optional",
+  "recomendaciones": "string-optional",
+  "comentarios_beneficiario": "string-optional"
 }
 ```
 
@@ -280,7 +396,7 @@ Respuesta 200:
 
 Errores:
 
-- 404: Bitacora no encontrada
+- 404: Bitácora no encontrada
 - 400: Solo se pueden editar borradores
 
 #### POST /bitacoras/:id/foto-rostro
@@ -315,7 +431,7 @@ Respuesta 200:
 
 FormData:
 
-- fotos: arreglo de archivos (maximo 10 por bitacora)
+- fotos: arreglo de archivos (máximo 10 por bitácora)
 
 Respuesta 200:
 
@@ -332,7 +448,7 @@ Body:
 ```json
 {
   "fecha_fin": "2026-03-23T11:00:00Z",
-  "coord_fin": "(x,y)"
+  "coord_fin": "(x,y)-optional"
 }
 ```
 
@@ -348,18 +464,18 @@ Respuesta 200:
 
 Errores:
 
-- 404: Bitacora no encontrada
-- 400: La bitacora ya esta cerrada
+- 404: Bitácora no encontrada
+- 400: La bitácora ya está cerrada
 
 #### DELETE /bitacoras/:id
 
-Elimina bitacoras en estado borrador creadas el mismo dia.
+Elimina bitácoras en estado borrador creadas el mismo día.
 
 Respuesta 200:
 
 ```json
 {
-  "message": "Bitacora eliminada"
+  "message": "Bitácora eliminada"
 }
 ```
 
@@ -392,7 +508,7 @@ Respuesta 200:
 
 ```json
 {
-  "message": "Marcada como leida"
+  "message": "Marcada como leída"
 }
 ```
 
@@ -408,7 +524,7 @@ Body:
 {
   "operaciones": [
     {
-      "operacion": "crear_bitacora",
+      "operacion": "crear_bitacora|editar_bitacora|cerrar_bitacora",
       "timestamp": "2026-03-23T10:00:00Z",
       "payload": {
         "tipo": "actividad",
@@ -437,7 +553,7 @@ Respuesta 200:
 }
 ```
 
-Nota: actualmente solo crear_bitacora esta implementada; cerrar_bitacora y editar_bitacora regresan exito false con mensaje.
+Nota: Las operaciones `crear_bitacora`, `editar_bitacora` y `cerrar_bitacora` están implementadas.
 
 #### GET /sync/delta?ultimo_sync=ISO-8601
 
@@ -476,51 +592,60 @@ Respuesta 200:
 
 Error 400:
 
-- Formato de fecha invalido en ultimo_sync
-  
-## Scripts de Utilidad  
-  
-### Crear Coordinadores  
-  
-Script para crear 3 usuarios coordinadores con codigos de acceso de 6 digitos.  
-  
-**Ubicacion:** `scripts/crear-coordinadores.ts`  
-  
-**Uso:**  
-  
-```bash  
-bun run scripts/crear-coordinadores.ts  
-```  
-  
-**Funcionalidad:**  
-  
-- Genera 3 usuarios coordinadores con codigos aleatorios de 6 digitos  
-- Cada usuario se crea con nombre, correo y codigo de acceso unico  
-- Los usuarios se crean como activos por defecto  
-- Muestra en consola los datos de cada coordinador creado  
-  
-**Ejemplo de salida:**  
-  
-```  
-Creando 3 usuarios coordinadores...  
-  
-V Coordinador creado exitosamente:  
-  ID: uuid  
-  Nombre: Coordinador 1  
-  Correo: coordinador1@ejemplo.com  
-  Codigo de acceso (6 digitos): 123456  
-  
-V Coordinador creado exitosamente:  
-  ID: uuid  
-  Nombre: Coordinador 2  
-  Correo: coordinador2@ejemplo.com  
-  Codigo de acceso (6 digitos): 789012  
-  
-V Coordinador creado exitosamente:  
-  ID: uuid  
-  Nombre: Coordinador 3  
-  Correo: coordinador3@ejemplo.com  
-  Codigo de acceso (6 digitos): 345678  
-  
-Proceso completado.  
-``` 
+- Formato de fecha inválido en ultimo_sync
+
+## Scripts de Utilidad
+
+### Crear Coordinadores
+
+Script para crear 3 usuarios coordinadores con códigos de acceso de 6 dígitos.
+
+**Ubicación:** `scripts/crear-coordinadores.ts`
+
+**Uso:**
+
+```bash
+bun run scripts/crear-coordinadores.ts
+```
+
+**Funcionalidad:**
+
+- Genera 3 usuarios coordinadores con códigos aleatorios de 6 dígitos
+- Cada usuario se crea con nombre, correo y código de acceso único
+- Los usuarios se crean como activos por defecto
+- Muestra en consola los datos de cada coordinador creado
+
+### Ver Estructura DB
+
+Script para ver la estructura completa de la base de datos.
+
+**Ubicación:** `scripts/ver-estructura-db.ts`
+
+**Uso:**
+
+```bash
+bun run scripts/ver-estructura-db.ts
+```
+
+**Funcionalidad:**
+
+- Muestra todas las tablas de la base de datos
+- Lista las columnas de cada tabla con sus tipos
+- Muestra las restricciones de cada tabla
+
+## Tablas de la Base de Datos Utilizadas
+
+| Tabla | Uso | Estado |
+|-------|-----|--------|
+| usuarios | Login, verificación de permisos | ✅ |
+| beneficiarios | CRUD de beneficiarios | ✅ |
+| actividades | Consulta de actividades asignadas | ✅ |
+| asignaciones_beneficiario | Filtrado de beneficiarios por técnico | ✅ |
+| asignaciones_actividad | Filtrado de actividades por técnico | ✅ |
+| bitacoras | CRUD completo de bitácoras | ✅ |
+| cadenas_productivas | Información para beneficiarios | ✅ |
+| notificaciones | Notificaciones del técnico | ✅ |
+| beneficiario_cadenas | Relación beneficiario-cadena | ✅ |
+| pdf_versiones | Versiones de PDF al cerrar bitácora | ✅ |
+| auth_logs | Auditoría de accesos | ✅ |
+| localidades | Catálogo para formularios | ✅ |

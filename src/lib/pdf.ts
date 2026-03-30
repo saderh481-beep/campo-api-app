@@ -1,6 +1,5 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-
-type Bitacora = Record<string, unknown>;
+import type { Bitacora } from "@/models";
 
 export async function generarPdfBitacora(bitacora: Bitacora): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
