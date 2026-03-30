@@ -81,13 +81,33 @@ Detalles de sesión:
 
 #### GET /health
 
-Respuesta 200:
+Verifica el estado del servidor y las conexiones a la base de datos y Redis.
+
+Respuesta 200 (OK):
 
 ```json
 {
   "status": "ok",
   "service": "api-app",
-  "ts": "2026-03-23T00:00:00.000Z"
+  "ts": "2026-03-23T00:00:00.000Z",
+  "checks": {
+    "database": "ok",
+    "redis": "ok"
+  }
+}
+```
+
+Respuesta 503 (Degraded):
+
+```json
+{
+  "status": "degraded",
+  "service": "api-app",
+  "ts": "2026-03-23T00:00:00.000Z",
+  "checks": {
+    "database": "error",
+    "redis": "ok"
+  }
 }
 ```
 

@@ -11,6 +11,9 @@ import {
   syncController,
 } from "@/controllers";
 
+import { sql } from "@/db";
+import { redis } from "@/lib/redis";
+
 const app = new Hono();
 
 app.use("*", logger());
@@ -24,9 +27,39 @@ app.use(
   })
 );
 
-app.get("/health", (c) =>
-  c.json({ status: "ok", service: "api-app", ts: new Date().toISOString() })
-);
+// Health check con verificación de conexiones
+app.get("/health", async (c) => {
+  const checks = {
+    status: "ok",
+    service: "api-app",
+    ts: new Date().toISOString(),
+    checks: {
+      database: "ok",
+      redis: "ok",
+    },
+  };
+
+  // Verificar conexión a la base de datos
+  try {
+    await sql`SELECT 1`;
+  } catch (err) {
+    checks.status = "degraded";
+    checks.checks.database = "error";
+    console.error("[Health] Error de conexión a la base de datos:", err);
+  }
+
+  // Verificar conexión a Redis
+  try {
+    await redis.ping();
+  } catch (err) {
+    checks.status = "degraded";
+    checks.checks.redis = "error";
+    console.error("[Health] Error de conexión a Redis:", err);
+  }
+
+  const statusCode = checks.status === "ok" ? 200 : 503;
+  return c.json(checks, statusCode);
+});
 
 // Rutas de autenticación
 app.route("/auth", authController);
