@@ -54,6 +54,8 @@ src/
 
 ## Autenticación
 
+**Nota temporal (BLACKBOXAI):** Validación de fecha_limite/periodo_vencido desactivada - ver TODO.md y PR.
+
 Rutas públicas:
 
 - GET /health
@@ -69,7 +71,7 @@ Detalles de sesión:
 
 - La sesión se guarda en Redis con clave session:{token}.
 - Si la sesión no existe o expira, responde 401.
-- Si el técnico está en periodo vencido o corte aplicado, responde 401 con error periodo_vencido.
+- **(TEMPORAL) Ignora fecha_limite vencida y estado_corte** - no bloquea con "periodo_vencido".
 - Los datos del técnico (autenticación y validación de sesión) se obtienen de la tabla usuarios.
 - Se registran logs de autenticación en la tabla `auth_logs`.
 
@@ -93,11 +95,13 @@ Respuesta 200:
 
 #### POST /auth/tecnico
 
+**Nota temporal (BLACKBOXAI):** Check de fecha_limite/periodo_vencido desactivado.
+
 Validaciones:
 
 - codigo debe ser numérico de 5 dígitos.
 - El usuario debe existir en la tabla usuarios y estar activo.
-- Si fecha_limite ya venció o estado_corte es distinto de en_servicio, responde 401 con error periodo_vencido.
+- **(TEMPORAL) Ignora fecha_limite vencida o estado_corte** - permite login independientemente.
 
 Body:
 
@@ -111,6 +115,7 @@ Respuesta 200:
 
 ```json
 {
+  "success": true,
   "token": "jwt_token",
   "tecnico": {
     "id": "uuid",
@@ -123,7 +128,6 @@ Errores:
 
 - 401: Código inválido o expirado
 - 401: Técnico no encontrado o inactivo
-- 401: periodo_vencido
 
 #### POST /auth/logout
 
