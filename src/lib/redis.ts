@@ -21,12 +21,7 @@ function sanitizeRedisUrl(url: string): string {
   return url;
 }
 
-export const redis = new Redis({
-  host: 'mainline.proxy.rlwy.net',
-  port: 26908,
-  username: 'default',
-  password: 'SdekIELQIOJNBXLIUXHgDfHQhfqSwgqU',
-  db: 0,
+export const redis = new Redis(process.env.REDIS_URL || 'redis://default:SdekIELQIOJNBXLIUXHgDfHQhfqSwgqU@mainline.proxy.rlwy.net:26908', {
   maxRetriesPerRequest: 1,
   enableReadyCheck: false,
   lazyConnect: true,
