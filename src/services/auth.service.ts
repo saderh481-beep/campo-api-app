@@ -29,15 +29,21 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
 
   const token = await signJwt({ sub: tecnico.id, nombre: tecnico.nombre, rol: "tecnico" });
 
-  await redis.setex(
-    `session:${token}`,
-    SESSION_TTL_SECONDS,
-    JSON.stringify({
-      sub: tecnico.id,
-      nombre: tecnico.nombre,
-      rol: "tecnico",
-    })
-  );
+  const safeTTL = Math.floor(SESSION_TTL_SECONDS);
+  try {
+    await redis.setex(
+      `session:${token}`,
+      safeTTL,
+      JSON.stringify({
+        sub: tecnico.id,
+        nombre: tecnico.nombre,
+        rol: "tecnico",
+      })
+    );
+  } catch (err) {
+    console.error('[Auth] setex failed:', err);
+    // Don't fail login on cache error
+  }
 
   // Registrar log de autenticación
   await sql`

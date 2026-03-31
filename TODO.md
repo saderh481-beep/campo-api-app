@@ -1,18 +1,16 @@
-# TODO - Redis Fix Progress (BLACKBOXAI)
+# TODO: Fix Redis Errors Plan Execution
 
-## ✅ Plan Aprobado y En Progreso
+## Approved Plan Steps:
+1. [x] Create TODO.md with breakdown ✅
+2. [ ] Update src/lib/redis.ts: Bulletproof sanitizer + URL parsing + db:0
+3. [ ] Update src/middleware/ratelimit.ts: NaN-proof incr/expire
+4. [ ] Update src/services/auth.service.ts: Safe TTL integers
+5. [ ] Update src/index.ts: Pre-startup health check
+6. [ ] Test locally: bun run dev + curl /health/redis
+7. [ ] Deploy Railway + clean REDIS_URL var
+8. [ ] Verify no more DeprecationWarning/NaN errors
+9. [ ] attempt_completion
 
-### Pendiente (0/4)
-- [ ] 1. Create TODO.md ✅ **HECHO**
-- [✅] 2. Edit src/lib/redis.ts (bulletproof sanitization + debugger) **HECHO**
-- [✅] 3. Edit src/index.ts (health check + validation) **HECHO**
+**Progress:** src/index.ts ✅ | Testing locally...
 
-- [✅] 4. Test local v2: bun run src/index.ts → **PENDING** (test full startup)
-- [✅] 6. Fix DATABASE_URL issue in src/db/index.ts **HECHO**
-- [✅] Redis bulletproof (no más crashes)
-- [ ] 5. Railway: Clean extra vars + deploy + test /health/redis
 
-- [ ] 7. Final Railway deploy
-- [ ] 6. Final completion
-
-**Next step:** Edit src/lib/redis.ts

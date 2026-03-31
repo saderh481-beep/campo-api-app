@@ -6,11 +6,25 @@ function sanitizePgUrl(url: string): string {
   
   let clean = url.trim().replace(/\/+$/, '');
   
-  // Fix Railway duplicated postgres://postgres://...
-  let dupeMatch;
-  while ((dupeMatch = clean.match(/postgres:\/\/[^?#]+?(?=postgres:\/\/)/i))) {
-    clean = clean.substring(0, dupeMatch.index!).replace(/\/+$/, '');
-    console.warn(`[PG] Fixed multi-dupe at pos ${dupeMatch.index}`);
+  // 🚀 BULLETPROOF PG SANITIZER v2 - Same as Redis
+  while (true) {
+    const dupPattern = /postgres:\/\/[^?#:@]+?(@[^?#:]+?:\\d+(?=postgres:)|\/[^?#]+(?=postgres:))/gi;
+    const newClean = clean.replace(dupPattern, '');
+    if (newClean === clean) break;
+    clean = newClean;
+    console.warn('[PG 🧹] Stripped Railway duplicate');
+  }
+  
+  // Fallback URL rebuild
+  try {
+    const urlObj = new URL(clean);
+    const rebuilt = `postgres://${urlObj.username}${urlObj.password ? ':' + urlObj.password : ''}@${urlObj.host}${urlObj.pathname}`;
+    if (rebuilt.length < 200 && urlObj.protocol === 'postgres:') {
+      clean = rebuilt;
+      console.log('[PG 🔧] URL rebuilt successfully');
+    }
+  } catch {
+    // Keep original clean if parse fails
   }
   
   console.log(`[PG ✅] DATABASE_URL (${clean.length} chars):`, 

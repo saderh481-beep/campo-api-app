@@ -35,6 +35,20 @@ const port = Number(process.env.PORT ?? 3002);
 console.log(`[api-app] Escuchando en http://0.0.0.0:${port}`);
 console.log(`[api-app] Entorno: ${process.env.NODE_ENV ?? "development"}`);
 
+// 🚀 PRE-STARTUP Redis health check
+console.log('[Startup] 🔍 Testing Redis connection...');
+try {
+  const health = await redisHealth();
+  if (health.status !== 'healthy') {
+    console.error('🚨 FATAL: Redis unhealthy at startup:', health);
+    process.exit(1);
+  }
+  console.log('[Startup] ✅ Redis healthy');
+} catch (err) {
+  console.error('🚨 FATAL: Redis health check failed:', err);
+  process.exit(1);
+}
+
 // Importar después de validar env (lazy load)
 import { redisHealth } from './lib/redis';
 
