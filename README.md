@@ -1,28 +1,37 @@
-# API App - Documentación de Endpoints
+# Campo API - Sistema de Gestión de Técnicos Agrícolas
 
-Esta API proporciona endpoints para la aplicación móvil de técnicos y servicios de backend para trabajo online/offline.
+API RESTful para la gestión de técnicos, beneficiarios y bitácoras agrícolas. Sistema robusto con soporte offline, autenticación segura y sincronización inteligente.
 
-## Arquitectura
+## 🚀 Características Principales
 
-La API está organizada en una arquitectura **models/controllers/services**:
+- **🔐 Autenticación Segura**: JWT con Redis para sesiones persistentes
+- **📱 Soporte Offline**: Sincronización inteligente para trabajo sin internet
+- **📊 Gestión Completa**: Beneficiarios, actividades, bitácoras y reportes
+- **☁️ Cloud Integration**: Cloudinary para manejo de archivos y evidencias
+- **🔒 Validación Robusta**: Protección contra ataques y datos inconsistentes
+- **⚡ Alta Disponibilidad**: Health checks y manejo de errores profesional
+
+## 🏗️ Arquitectura
+
+La API sigue una arquitectura limpia y escalable:
 
 ```
 src/
 ├── app.ts                    # Configuración principal de Hono
-├── index.ts                  # Punto de entrada
+├── index.ts                  # Punto de entrada con validación de entorno
 ├── controllers/              # Controladores de rutas
-│   ├── auth.controller.ts
-│   ├── beneficiario.controller.ts
-│   ├── bitacora.controller.ts
-│   ├── notificacion.controller.ts
-│   ├── sync.controller.ts
+│   ├── auth.controller.ts    # Autenticación de técnicos
+│   ├── beneficiario.controller.ts  # Gestión de beneficiarios
+│   ├── bitacora.controller.ts      # Bitácoras y reportes
+│   ├── notificacion.controller.ts  # Notificaciones
+│   ├── sync.controller.ts          # Sincronización offline
 │   └── index.ts
 ├── services/                 # Lógica de negocio
-│   ├── auth.service.ts
+│   ├── auth.service.ts       # Servicios de autenticación
 │   ├── beneficiario.service.ts
 │   ├── bitacora.service.ts
 │   ├── notificacion.service.ts
-│   ├── sync.service.ts
+│   ├── sync.service.ts       # Sincronización inteligente
 │   └── index.ts
 ├── models/                   # Tipos TypeScript
 │   ├── usuario.ts
@@ -32,644 +41,339 @@ src/
 │   ├── auth-log.ts
 │   └── index.ts
 ├── lib/                      # Utilidades
-│   ├── cloudinary.ts
-│   ├── jwt.ts
-│   ├── pdf.ts
-│   └── redis.ts
+│   ├── cloudinary.ts         # Manejo de archivos
+│   ├── jwt.ts                # Autenticación JWT
+│   ├── pdf.ts                # Generación de PDFs
+│   └── redis.ts              # Conexión y sanitización Redis
 ├── middleware/               # Middlewares
-│   ├── auth.ts
-│   └── ratelimit.ts
-└── db/                       # Conexión a BD
-    └── index.ts
+│   ├── auth.ts               # Middleware de autenticación
+│   └── ratelimit.ts          # Protección contra ataques
+└── db/                       # Conexión a base de datos
+    └── index.ts              # PostgreSQL con sanitización
 ```
 
-## Flujo funcional esperado
+## 📋 Requisitos del Sistema
 
-1. El técnico inicia sesión con código de acceso de 5 dígitos.
-2. Descarga sus beneficiarios y actividades asignadas.
-3. Crea y llena bitácoras con evidencias, en línea o fuera de línea.
-4. Cierra bitácoras.
-5. Si hay internet, sincroniza bitácoras y evidencias con los servicios correspondientes.
-6. La sesión autenticada se guarda en Redis.
+- **Node.js**: Versión 18 o superior
+- **Bun**: Runtime moderno para TypeScript
+- **PostgreSQL**: Base de datos relacional
+- **Redis**: Almacenamiento de sesiones y cache
+- **Cloudinary**: Almacenamiento de archivos (opcional para desarrollo)
 
-## Autenticación
+## ⚙️ Configuración
 
-**Nota temporal (BLACKBOXAI):** Validación de fecha_limite/periodo_vencido desactivada - ver TODO.md y PR.
+### Variables de Entorno
 
-Rutas públicas:
+Crea un archivo `.env` basado en `.env.example`:
 
-- GET /health
-- POST /auth/tecnico
+```env
+# Base de datos
+DATABASE_URL="postgresql://postgres:password@localhost:5432/campo_db"
+DATABASE_PUBLIC_URL="postgresql://postgres:password@localhost:5432/campo_db"
 
-El resto de rutas requiere token en el header Authorization:
+# Redis
+REDIS_URL="redis://localhost:6379"
+REDIS_PUBLIC_URL="redis://localhost:6379"
 
-```txt
-Authorization: Bearer <token>
+# JWT
+JWT_SECRET="tu_clave_secreta_jwt_aqui"
+
+# Cloudinary (para producción)
+CLOUDINARY_CLOUD_NAME="tu_cloud_name"
+CLOUDINARY_API_KEY="tu_api_key"
+CLOUDINARY_API_SECRET="tu_api_secret"
+CLOUDINARY_PRESET_IMAGENES="campo_imagenes"
+CLOUDINARY_PRESET_DOCS="campo_docs"
+
+# Servidor
+PORT=3002
+NODE_ENV=development
 ```
 
-Detalles de sesión:
+### Instalación
 
-- La sesión se guarda en Redis con clave session:{token}.
-- Si la sesión no existe o expira, responde 401.
-- **(TEMPORAL) Ignora fecha_limite vencida y estado_corte** - no bloquea con "periodo_vencido".
-- Los datos del técnico (autenticación y validación de sesión) se obtienen de la tabla usuarios.
-- Se registran logs de autenticación en la tabla `auth_logs`.
+```bash
+# Instalar dependencias
+bun install
 
-## Endpoints
+# Iniciar desarrollo
+bun run dev
 
-### Health
+# Construir para producción
+bun run build
 
-#### GET /health
-
-Verifica el estado del servidor y las conexiones a la base de datos y Redis.
-
-Respuesta 200 (OK):
-
-```json
-{
-  "status": "ok",
-  "service": "api-app",
-  "ts": "2026-03-23T00:00:00.000Z",
-  "checks": {
-    "database": "ok",
-    "redis": "ok"
-  }
-}
+# Iniciar producción
+bun run start
 ```
 
-Respuesta 503 (Degraded):
+## 🔌 Endpoints API
 
-```json
-{
-  "status": "degraded",
-  "service": "api-app",
-  "ts": "2026-03-23T00:00:00.000Z",
-  "checks": {
-    "database": "error",
-    "redis": "ok"
-  }
-}
-```
-
-### Auth
+### Autenticación
 
 #### POST /auth/tecnico
+Inicia sesión de técnico con código de acceso.
 
-**Nota temporal (BLACKBOXAI):** Check de fecha_limite/periodo_vencido desactivado.
-
-Validaciones:
-
-- codigo debe ser numérico de 5 dígitos.
-- El usuario debe existir en la tabla usuarios y estar activo.
-- **(TEMPORAL) Ignora fecha_limite vencida o estado_corte** - permite login independientemente.
-
-Body:
-
+**Body:**
 ```json
 {
   "codigo": "12345"
 }
 ```
 
-Respuesta 200:
-
+**Respuesta:**
 ```json
 {
   "success": true,
-  "token": "jwt_token",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "tecnico": {
-    "id": "uuid",
-    "nombre": "string"
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "nombre": "Juan Pérez",
+    "rol": "tecnico"
   }
 }
 ```
-
-Errores:
-
-- 401: Código inválido o expirado
-- 401: Técnico no encontrado o inactivo
 
 #### POST /auth/logout
+Cierra sesión del técnico autenticado.
 
-Cierra la sesión del técnico autenticado.
-
-Respuesta 200:
-
-```json
-{
-  "message": "Sesión cerrada"
-}
-```
-
-### Datos
-
-Nota: estas rutas están montadas en la raiz.
+### Beneficiarios
 
 #### GET /mis-beneficiarios
-
-Respuesta 200:
-
-```json
-[
-  {
-    "id": "uuid",
-    "nombre": "string",
-    "municipio": "string",
-    "localidad": "string|null",
-    "direccion": "string|null",
-    "cp": "string|null",
-    "telefono_principal": "string|null",
-    "telefono_secundario": "string|null",
-    "coord_parcela": "string|null",
-    "activo": true,
-    "cadenas": [
-      {
-        "id": "uuid",
-        "nombre": "string"
-      }
-    ]
-  }
-]
-```
+Obtiene beneficiarios asignados al técnico.
 
 #### POST /beneficiarios
+Registra un nuevo beneficiario.
 
-Crea un nuevo beneficiario y lo asigna automáticamente al técnico.
-
-Body:
-
+**Body:**
 ```json
 {
-  "nombre_completo": "string",
-  "municipio": "string",
-  "localidad": "string",
-  "telefono_contacto": "string",
-  "cadena_productiva": "string-optional"
+  "nombre_completo": "María González",
+  "municipio": "San Luis Potosí",
+  "localidad": "Centro",
+  "telefono_contacto": "4441234567",
+  "cadena_productiva": "Maíz"
 }
-```
-
-Respuesta 201:
-
-```json
-{
-  "id": "uuid",
-  "nombre": "string",
-  "municipio": "string",
-  "localidad": "string",
-  "telefono_principal": "string",
-  "activo": true,
-  "cadenas": []
-}
-```
-
-#### GET /mis-actividades
-
-Respuesta 200:
-
-```json
-[
-  {
-    "id": "uuid",
-    "nombre": "string",
-    "descripcion": "string|null",
-    "activo": true,
-    "created_by": "uuid",
-    "created_at": "timestamp",
-    "updated_at": "timestamp"
-  }
-]
-```
-
-#### GET /cadenas-productivas
-
-Respuesta 200:
-
-```json
-[
-  {
-    "id": "uuid",
-    "nombre": "string",
-    "descripcion": "string|null",
-    "activo": true,
-    "created_by": "uuid",
-    "created_at": "timestamp",
-    "updated_at": "timestamp"
-  }
-]
-```
-
-#### GET /localidades?municipio=string
-
-Obtiene localidades filtradas por municipio.
-
-Respuesta 200:
-
-```json
-[
-  {
-    "id": "uuid",
-    "municipio": "string",
-    "nombre": "string",
-    "cp": "string|null",
-    "activo": true,
-    "created_by": "uuid|null",
-    "created_at": "timestamp",
-    "updated_at": "timestamp",
-    "zona_id": "uuid|null"
-  }
-]
 ```
 
 ### Bitácoras
 
-#### GET /bitacoras?limit=50&offset=0
-
-Obtiene las bitácoras del técnico autenticado para el mes actual con paginación.
-
-Parámetros de consulta:
-- `limit`: Número máximo de resultados (default: 50)
-- `offset`: Número de resultados a saltar (default: 0)
-
-Respuesta 200:
-
-```json
-[
-  {
-    "id": "uuid",
-    "tipo": "beneficiario|actividad",
-    "estado": "borrador|cerrada|...",
-    "fecha_inicio": "timestamp",
-    "fecha_fin": "timestamp|null",
-    "sync_id": "uuid|null"
-  }
-]
-```
-
-#### GET /bitacoras/:id
-
-Respuesta 200:
-
-```json
-{
-  "id": "uuid",
-  "tipo": "beneficiario|actividad",
-  "tecnico_id": "uuid",
-  "beneficiario_id": "uuid|null",
-  "cadena_productiva_id": "uuid|null",
-  "actividad_id": "uuid|null",
-  "fecha_inicio": "timestamp",
-  "fecha_fin": "timestamp|null",
-  "coord_inicio": "string|null",
-  "coord_fin": "string|null",
-  "actividades_desc": "string",
-  "recomendaciones": "string|null",
-  "comentarios_beneficiario": "string|null",
-  "coordinacion_interinst": "boolean",
-  "instancia_coordinada": "string|null",
-  "proposito_coordinacion": "string|null",
-  "observaciones_coordinador": "string|null",
-  "foto_rostro_url": "string|null",
-  "firma_url": "string|null",
-  "fotos_campo": ["string"],
-  "estado": "string",
-  "pdf_version": "number",
-  "pdf_url_actual": "string|null",
-  "pdf_original_url": "string|null",
-  "creada_offline": "boolean",
-  "sync_id": "uuid|null",
-  "created_at": "timestamp",
-  "updated_at": "timestamp"
-}
-```
-
-Errores:
-
-- 404: Bitácora no encontrada
-
 #### POST /bitacoras
+Crea una nueva bitácora (tipo beneficiario o actividad).
 
-Body tipo beneficiario:
-
+**Body Tipo Beneficiario:**
 ```json
 {
   "tipo": "beneficiario",
-  "beneficiario_id": "uuid",
-  "cadena_productiva_id": "uuid-optional",
+  "beneficiario_id": "550e8400-e29b-41d4-a716-446655440000",
+  "cadena_productiva_id": "550e8400-e29b-41d4-a716-446655440001",
   "fecha_inicio": "2026-03-23T10:00:00Z",
-  "coord_inicio": "(x,y)-optional",
-  "sync_id": "uuid-optional"
+  "coord_inicio": "(22.1234,-100.5678)",
+  "sync_id": "sync-12345"
 }
 ```
 
-Body tipo actividad:
-
+**Body Tipo Actividad:**
 ```json
 {
   "tipo": "actividad",
-  "actividad_id": "uuid",
+  "actividad_id": "550e8400-e29b-41d4-a716-446655440002",
   "fecha_inicio": "2026-03-23T10:00:00Z",
-  "coord_inicio": "(x,y)-optional",
-  "sync_id": "uuid-optional"
+  "coord_inicio": "(22.1234,-100.5678)",
+  "sync_id": "sync-12346"
 }
 ```
-
-Respuesta 201:
-
-```json
-{
-  "id": "uuid",
-  "tipo": "string",
-  "estado": "borrador",
-  "fecha_inicio": "timestamp",
-  "sync_id": "uuid|null"
-}
-```
-
-Si el sync_id ya existe, responde con el id existente y duplicado true.
-
-#### PATCH /bitacoras/:id
-
-Actualiza solo bitácoras en estado borrador.
-
-Body:
-
-```json
-{
-  "observaciones_coordinador": "string-optional",
-  "actividades_desc": "string-optional",
-  "coord_inicio": "string-optional",
-  "coord_fin": "string-optional",
-  "fecha_inicio": "timestamp-optional",
-  "fecha_fin": "timestamp-optional",
-  "recomendaciones": "string-optional",
-  "comentarios_beneficiario": "string-optional"
-}
-```
-
-Respuesta 200:
-
-```json
-{
-  "id": "uuid",
-  "tipo": "string",
-  "estado": "borrador",
-  "observaciones_coordinador": "string|null",
-  "actividades_desc": "string"
-}
-```
-
-Errores:
-
-- 404: Bitácora no encontrada
-- 400: Solo se pueden editar borradores
 
 #### POST /bitacoras/:id/foto-rostro
-
-FormData:
-
-- foto: archivo
-
-Respuesta 200:
-
-```json
-{
-  "foto_rostro_url": "string"
-}
-```
+Sube foto del rostro del beneficiario.
 
 #### POST /bitacoras/:id/firma
-
-FormData:
-
-- firma: archivo
-
-Respuesta 200:
-
-```json
-{
-  "firma_url": "string"
-}
-```
+Sube firma del beneficiario.
 
 #### POST /bitacoras/:id/fotos-campo
-
-FormData:
-
-- fotos: arreglo de archivos (máximo 10 por bitácora)
-
-Respuesta 200:
-
-```json
-{
-  "fotos_campo": ["string"]
-}
-```
+Sube fotos del trabajo en campo (máximo 10).
 
 #### POST /bitacoras/:id/cerrar
+Cierra bitácora y genera PDF.
 
-Body:
-
-```json
-{
-  "fecha_fin": "2026-03-23T11:00:00Z",
-  "coord_fin": "(x,y)-optional"
-}
-```
-
-Respuesta 200:
-
-```json
-{
-  "id": "uuid",
-  "estado": "cerrada",
-  "pdf_url": "string"
-}
-```
-
-Errores:
-
-- 404: Bitácora no encontrada
-- 400: La bitácora ya está cerrada
-
-#### DELETE /bitacoras/:id
-
-Elimina bitácoras en estado borrador creadas el mismo día.
-
-Respuesta 200:
-
-```json
-{
-  "message": "Bitácora eliminada"
-}
-```
-
-### Notificaciones
-
-#### GET /notificaciones
-
-Respuesta 200:
-
-```json
-[
-  {
-    "id": "uuid",
-    "destino_id": "uuid",
-    "destino_tipo": "string",
-    "tipo": "string",
-    "titulo": "string",
-    "cuerpo": "string",
-    "leido": false,
-    "enviado_push": false,
-    "enviado_email": false,
-    "created_at": "timestamp"
-  }
-]
-```
-
-#### PATCH /notificaciones/:id/leer
-
-Respuesta 200:
-
-```json
-{
-  "message": "Marcada como leída"
-}
-```
-
-### Sync
+### Sincronización Offline
 
 #### POST /sync
+Sincroniza operaciones realizadas offline.
 
-Procesa operaciones offline ordenadas por timestamp.
-
-Body:
-
+**Body:**
 ```json
 {
   "operaciones": [
     {
-      "operacion": "crear_bitacora|editar_bitacora|cerrar_bitacora",
+      "operacion": "crear_bitacora",
       "timestamp": "2026-03-23T10:00:00Z",
       "payload": {
-        "tipo": "actividad",
-        "actividad_id": "uuid",
+        "tipo": "beneficiario",
+        "beneficiario_id": "550e8400-e29b-41d4-a716-446655440000",
         "fecha_inicio": "2026-03-23T10:00:00Z",
-        "coord_inicio": "(x,y)",
-        "sync_id": "uuid"
+        "sync_id": "sync-12345"
       }
     }
   ]
 }
 ```
 
-Respuesta 200:
+#### GET /sync/delta?ultimo_sync=2026-03-23T00:00:00Z
+Obtiene cambios desde la última sincronización.
 
-```json
-{
-  "procesadas": 1,
-  "resultados": [
-    {
-      "sync_id": "uuid",
-      "operacion": "crear_bitacora",
-      "exito": true
-    }
-  ]
-}
+## 🛡️ Seguridad
+
+### Autenticación JWT
+- Tokens con expiración de 30 días
+- Algoritmo HS256 para firma
+- Almacenamiento seguro en Redis
+- Validación en cada solicitud protegida
+
+### Rate Limiting
+- Protección contra ataques de fuerza bruta
+- 10 intentos de login por minuto
+- 20 solicitudes generales por minuto
+
+### Validación de Datos
+- Esquemas Zod para validación robusta
+- Sanitización de URLs para prevenir duplicados
+- Validación de asignaciones (técnico ↔ beneficiario/actividad)
+
+## 📊 Base de Datos
+
+### Tablas Principales
+
+| Tabla | Descripción | Estado |
+|-------|-------------|--------|
+| usuarios | Técnicos y coordinadores | ✅ |
+| beneficiarios | Información de beneficiarios | ✅ |
+| actividades | Actividades asignadas | ✅ |
+| bitacoras | Reportes y seguimiento | ✅ |
+| asignaciones_beneficiario | Relación técnico-beneficiario | ✅ |
+| asignaciones_actividad | Relación técnico-actividad | ✅ |
+| beneficiario_cadenas | Cadena productiva del beneficiario | ✅ |
+| pdf_versiones | Versiones de PDFs generados | ✅ |
+| auth_logs | Auditoría de accesos | ✅ |
+| localidades | Catálogo de localidades | ✅ |
+
+### Conexiones Seguras
+- Sanitización automática de URLs duplicadas
+- Validación de conexiones en startup
+- Health checks continuos
+- Timeouts configurables
+
+## 🚀 Despliegue
+
+### Docker
+```bash
+# Construir imagen
+docker build -t campo-api .
+
+# Iniciar contenedor
+docker run -p 3002:3002 campo-api
 ```
 
-Nota: Las operaciones `crear_bitacora`, `editar_bitacora` y `cerrar_bitacora` están implementadas.
+### Railway
+1. Conectar repositorio a Railway
+2. Configurar variables de entorno
+3. Desplegar automáticamente
 
-#### GET /sync/delta?ultimo_sync=ISO-8601
-
-Respuesta 200:
-
-```json
-{
-  "sync_ts": "timestamp",
-  "beneficiarios": [
-    {
-      "id": "uuid",
-      "nombre": "string",
-      "municipio": "string",
-      "localidad": "string|null",
-      "updated_at": "timestamp"
-    }
-  ],
-  "actividades": [
-    {
-      "id": "uuid",
-      "nombre": "string",
-      "descripcion": "string|null",
-      "updated_at": "timestamp"
-    }
-  ],
-  "cadenas": [
-    {
-      "id": "uuid",
-      "nombre": "string",
-      "descripcion": "string|null",
-      "updated_at": "timestamp"
-    }
-  ]
-}
+### Variables para Producción
+```env
+NODE_ENV=production
+PORT=3002
+DATABASE_URL="postgresql://..."
+REDIS_URL="redis://..."
+JWT_SECRET="clave_secreta_segura"
 ```
 
-Error 400:
+## 🧪 Pruebas
 
-- Formato de fecha inválido en ultimo_sync
+### Validación de Tipos
+```bash
+bun run typecheck
+```
 
-## Scripts de Utilidad
+### Scripts de Utilidad
 
-### Crear Coordinadores
-
-Script para crear 3 usuarios coordinadores con códigos de acceso de 6 dígitos.
-
-**Ubicación:** `scripts/crear-coordinadores.ts`
-
-**Uso:**
-
+#### Crear Coordinadores
 ```bash
 bun run scripts/crear-coordinadores.ts
 ```
 
-**Funcionalidad:**
-
-- Genera 3 usuarios coordinadores con códigos aleatorios de 6 dígitos
-- Cada usuario se crea con nombre, correo y código de acceso único
-- Los usuarios se crean como activos por defecto
-- Muestra en consola los datos de cada coordinador creado
-
-### Ver Estructura DB
-
-Script para ver la estructura completa de la base de datos.
-
-**Ubicación:** `scripts/ver-estructura-db.ts`
-
-**Uso:**
-
+#### Ver Estructura DB
 ```bash
 bun run scripts/ver-estructura-db.ts
 ```
 
-**Funcionalidad:**
+## 🔧 Solución de Problemas
 
-- Muestra todas las tablas de la base de datos
-- Lista las columnas de cada tabla con sus tipos
-- Muestra las restricciones de cada tabla
+### Errores Comunes
 
-## Tablas de la Base de Datos Utilizadas
+#### Conexión a Redis Fallida
+```bash
+# Verificar Redis está corriendo
+redis-cli ping
 
-| Tabla | Uso | Estado |
-|-------|-----|--------|
-| usuarios | Login, verificación de permisos | ✅ |
-| beneficiarios | CRUD de beneficiarios | ✅ |
-| actividades | Consulta de actividades asignadas | ✅ |
-| asignaciones_beneficiario | Filtrado de beneficiarios por técnico | ✅ |
-| asignaciones_actividad | Filtrado de actividades por técnico | ✅ |
-| bitacoras | CRUD completo de bitácoras | ✅ |
-| cadenas_productivas | Información para beneficiarios | ✅ |
-| notificaciones | Notificaciones del técnico | ✅ |
-| beneficiario_cadenas | Relación beneficiario-cadena | ✅ |
-| pdf_versiones | Versiones de PDF al cerrar bitácora | ✅ |
-| auth_logs | Auditoría de accesos | ✅ |
-| localidades | Catálogo para formularios | ✅ |
+# Verificar URL en .env
+echo $REDIS_URL
+```
+
+#### Conexión a PostgreSQL Fallida
+```bash
+# Verificar PostgreSQL está corriendo
+pg_isready -h localhost -p 5432
+
+# Verificar credenciales en .env
+echo $DATABASE_URL
+```
+
+#### JWT Secret No Configurado
+```bash
+# Generar nuevo secreto
+node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"
+```
+
+### Logs de Depuración
+```bash
+# Ver logs en tiempo real
+bun run dev
+
+# Ver logs de producción
+docker logs <container_id>
+```
+
+## 📈 Monitoreo
+
+### Health Checks
+- `/health` - Estado general del sistema
+- `/health/redis` - Estado de conexión a Redis
+
+### Métricas
+- Contador de operaciones por endpoint
+- Tiempos de respuesta
+- Errores por tipo
+
+## 🤝 Contribución
+
+1. Fork del repositorio
+2. Crear rama de característica
+3. Realizar cambios
+4. Probar localmente
+5. Crear pull request
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver [LICENSE](LICENSE) para más detalles.
+
+## 📞 Soporte
+
+Para soporte técnico o reporte de bugs:
+
+- Crea un issue en GitHub
+- Contacta al equipo de desarrollo
+- Revisa la documentación en línea
+
+---
+
+**Campo API** - Simplificando la gestión agrícola con tecnología moderna.

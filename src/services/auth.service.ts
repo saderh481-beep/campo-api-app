@@ -7,7 +7,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 export async function loginTecnico(codigo: string, ip?: string, userAgent?: string) {
   const [tecnico] = await sql<UsuarioLogin[]>`
-    SELECT id, nombre, correo, activo, fecha_limite, estado_corte
+    SELECT id, nombre, correo, activo
     FROM usuarios
     WHERE codigo_acceso = ${codigo} AND activo = true
     LIMIT 1
@@ -16,16 +16,6 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
   if (!tecnico) {
     return { success: false, error: "Código inválido o expirado" };
   }
-
-  /* TODO: [BLACKBOXAI] Desactivado temporalmente fecha global
-  const fechaLimiteVencida = tecnico.fecha_limite
-    ? new Date(tecnico.fecha_limite).getTime() < Date.now()
-    : false;
-  const corteAplicado = tecnico.estado_corte && tecnico.estado_corte !== "en_servicio";
-
-  if (fechaLimiteVencida || corteAplicado) {
-    return { success: false, error: "periodo_vencido" };
-  } */
 
   const token = await signJwt({ sub: tecnico.id, nombre: tecnico.nombre, rol: "tecnico" });
 

@@ -1,30 +1,36 @@
 import postgres from "postgres";
 
-// Sanitize DATABASE_URL same way as Redis (Railway common issue)
+// Helper function to fix duplicated PostgreSQL URLs (similar to Redis)
 function sanitizePgUrl(url: string): string {
   if (!url) throw new Error('DATABASE_URL missing');
   
   let clean = url.trim().replace(/\/+$/, '');
   
-  // 🚀 BULLETPROOF PG SANITIZER v2 - Same as Redis
-  while (true) {
-    const dupPattern = /postgres:\/\/[^?#:@]+?(@[^?#:]+?:\\d+(?=postgres:)|\/[^?#]+(?=postgres:))/gi;
-    const newClean = clean.replace(dupPattern, '');
-    if (newClean === clean) break;
-    clean = newClean;
-    console.warn('[PG 🧹] Stripped Railway duplicate');
+  // Check if the URL is duplicated (e.g., "postgresql://...postgresql://...")
+  const pgProtocolPattern = /postgresql:\/\//g;
+  const matches = clean.match(pgProtocolPattern);
+  
+  if (matches && matches.length > 1) {
+    // Find the second occurrence and truncate
+    const firstEnd = clean.indexOf("postgresql://");
+    const secondStart = clean.indexOf("postgresql://", firstEnd + 1);
+    if (secondStart > -1) {
+      console.warn("[PG 🧹] URL duplicada detectada, usando solo la primera parte");
+      clean = clean.substring(0, secondStart).replace(/\/+$/, "");
+    }
   }
   
-  // Fallback URL rebuild
-  try {
-    const urlObj = new URL(clean);
-    const rebuilt = `postgres://${urlObj.username}${urlObj.password ? ':' + urlObj.password : ''}@${urlObj.host}${urlObj.pathname}`;
-    if (rebuilt.length < 200 && urlObj.protocol === 'postgres:') {
-      clean = rebuilt;
-      console.log('[PG 🔧] URL rebuilt successfully');
+  // Alternative check for postgres:// protocol
+  const postgresProtocolPattern = /postgres:\/\//g;
+  const postgresMatches = clean.match(postgresProtocolPattern);
+  
+  if (postgresMatches && postgresMatches.length > 1) {
+    const firstEnd = clean.indexOf("postgres://");
+    const secondStart = clean.indexOf("postgres://", firstEnd + 1);
+    if (secondStart > -1) {
+      console.warn("[PG 🧹] URL duplicada detectada, usando solo la primera parte");
+      clean = clean.substring(0, secondStart).replace(/\/+$/, "");
     }
-  } catch {
-    // Keep original clean if parse fails
   }
   
   console.log(`[PG ✅] DATABASE_URL (${clean.length} chars):`, 

@@ -37,17 +37,19 @@ console.log(`[api-app] Escuchando en http://0.0.0.0:${port}`);
 console.log(`[api-app] Entorno: ${process.env.NODE_ENV ?? "development"}`);
 
 // 🚀 PRE-STARTUP Redis health check
-console.log('[Startup] 🔍 Testing Redis connection...');
-try {
-  const health = await redisHealth();
-  if (health.status !== 'healthy') {
-    console.error('🚨 FATAL: Redis unhealthy at startup:', health);
+async function startupHealthCheck() {
+  console.log('[Startup] 🔍 Testing Redis connection...');
+  try {
+    const health = await redisHealth();
+    if (health.status !== 'healthy') {
+      console.error('🚨 FATAL: Redis unhealthy at startup:', health);
+      process.exit(1);
+    }
+    console.log('[Startup] ✅ Redis healthy');
+  } catch (err) {
+    console.error('🚨 FATAL: Redis health check failed:', err);
     process.exit(1);
   }
-  console.log('[Startup] ✅ Redis healthy');
-} catch (err) {
-  console.error('🚨 FATAL: Redis health check failed:', err);
-  process.exit(1);
 }
 
 // Health check con Redis específico
@@ -60,7 +62,18 @@ app.get('/health/redis', async (c) => {
   });
 });
 
-export default {
-  port,
-  fetch: app.fetch,
-};
+// Realizar health check antes de iniciar y luego iniciar el servidor
+startupHealthCheck().then(() => {
+  console.log('[Startup] ✅ All health checks passed, starting server...');
+  
+  // Iniciar el servidor solo después de que los health checks pasen
+  Bun.serve({
+    port: port,
+    fetch: app.fetch,
+  });
+  
+  console.log(`[api-app] ✅ Servidor iniciado en http://0.0.0.0:${port}`);
+}).catch((err) => {
+  console.error('🚨 FATAL: Startup health check failed:', err);
+  process.exit(1);
+});
