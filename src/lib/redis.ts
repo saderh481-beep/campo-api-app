@@ -1,12 +1,36 @@
 // redis.ts
 import { Redis } from "ioredis";
 
+// Helper function to fix duplicated Redis URLs
+function sanitizeRedisUrl(url: string): string {
+  if (!url) return url;
+  
+  // Check if the URL is duplicated (e.g., "redis://...redis://...")
+  const redisProtocolPattern = /redis:\/\//g;
+  const matches = url.match(redisProtocolPattern);
+  
+  if (matches && matches.length > 1) {
+    // Find the second occurrence and truncate
+    const firstEnd = url.indexOf("redis://");
+    const secondStart = url.indexOf("redis://", firstEnd + 1);
+    if (secondStart > -1) {
+      console.warn("⚠️  [Redis] URL duplicada detectada, usando solo la primera parte");
+      return url.substring(0, secondStart).replace(/\/+$/, "");
+    }
+  }
+  
+  return url;
+}
+
 if (!process.env.REDIS_URL) {
   throw new Error("❌ REDIS_URL no está configurada en Railway");
 }
 
+// Sanitize the URL to handle potential duplication
+const redisUrl = sanitizeRedisUrl(process.env.REDIS_URL);
+
 // Configuración limpia y estable para Railway
-export const redis = new Redis(process.env.REDIS_URL, {
+export const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
   lazyConnect: true,
