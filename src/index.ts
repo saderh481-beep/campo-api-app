@@ -1,4 +1,5 @@
 import app from "./app";
+import { redisHealth } from './lib/redis';
 
 // Validar variables de entorno requeridas
 const requiredEnvVars = [
@@ -48,9 +49,6 @@ try {
   console.error('🚨 FATAL: Redis health check failed:', err);
   process.exit(1);
 }
-
-// Importar después de validar env (lazy load)
-import { redisHealth } from './lib/redis';
 
 // Health check con Redis específico
 app.get('/health/redis', async (c) => {
