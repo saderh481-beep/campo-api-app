@@ -13,7 +13,7 @@ const app = new Hono<{
 }>();
 
 const schemaLogin = z.object({
-  codigo: z.string().regex(/^\d{5}$/),
+  codigo: z.string().trim().regex(/^\d{5,6}$/),
 });
 
 app.post(

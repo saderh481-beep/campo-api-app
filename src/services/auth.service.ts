@@ -5,13 +5,57 @@ import type { UsuarioLogin } from "@/models";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
+function normalizarCodigo(codigo: string) {
+  return codigo.trim();
+}
+
+function rolEsTecnico(rol: string | null | undefined) {
+  return (rol ?? "").trim().toLowerCase() === "tecnico";
+}
+
+function tieneCorteActivo(estadoCorte: string | null | undefined) {
+  const estado = (estadoCorte ?? "").trim().toLowerCase();
+  return estado !== "" && estado !== "en_servicio" && estado !== "activo";
+}
+
+async function codigoCoincideConHash(codigo: string, hash: string | null) {
+  if (!hash) return false;
+
+  try {
+    return await Bun.password.verify(codigo, hash);
+  } catch {
+    return false;
+  }
+}
+
 export async function loginTecnico(codigo: string, ip?: string, userAgent?: string) {
-  const [tecnico] = await sql<UsuarioLogin[]>`
-    SELECT id, nombre, correo, activo, fecha_limite, estado_corte
+  const codigoNormalizado = normalizarCodigo(codigo);
+
+  const tecnicos = await sql<UsuarioLogin[]>`
+    SELECT id, nombre, correo, rol, activo, codigo_acceso, hash_codigo_acceso, fecha_limite, estado_corte
     FROM usuarios
-    WHERE codigo_acceso = ${codigo} AND activo = true
-    LIMIT 1
+    WHERE activo = true
+      AND LOWER(COALESCE(rol, '')) = 'tecnico'
+      AND (
+        codigo_acceso = ${codigoNormalizado}
+        OR hash_codigo_acceso IS NOT NULL
+      )
+    ORDER BY updated_at DESC, created_at DESC
   `;
+
+  let tecnico =
+    tecnicos.find((usuario) => usuario.codigo_acceso === codigoNormalizado && rolEsTecnico(usuario.rol)) ??
+    null;
+
+  if (!tecnico) {
+    for (const candidato of tecnicos) {
+      if (!rolEsTecnico(candidato.rol)) continue;
+      if (await codigoCoincideConHash(codigoNormalizado, candidato.hash_codigo_acceso)) {
+        tecnico = candidato;
+        break;
+      }
+    }
+  }
 
   if (!tecnico) {
     return { success: false, error: "Código inválido o expirado" };
@@ -20,7 +64,7 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
   const fechaLimiteVencida = tecnico.fecha_limite
     ? new Date(tecnico.fecha_limite).getTime() < Date.now()
     : false;
-  const corteAplicado = tecnico.estado_corte && tecnico.estado_corte !== "en_servicio";
+  const corteAplicado = tieneCorteActivo(tecnico.estado_corte);
 
   if (fechaLimiteVencida || corteAplicado) {
     return { success: false, error: "periodo_vencido" };

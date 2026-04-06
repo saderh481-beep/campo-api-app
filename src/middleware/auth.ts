@@ -59,7 +59,8 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const fechaLimiteVencida = tecnicoActual.fecha_limite
     ? new Date(tecnicoActual.fecha_limite).getTime() < Date.now()
     : false;
-  const corteAplicado = tecnicoActual.estado_corte && tecnicoActual.estado_corte !== "en_servicio";
+  const estadoCorte = (tecnicoActual.estado_corte ?? "").trim().toLowerCase();
+  const corteAplicado = estadoCorte !== "" && estadoCorte !== "en_servicio" && estadoCorte !== "activo";
 
   if (fechaLimiteVencida || corteAplicado) {
     try {
