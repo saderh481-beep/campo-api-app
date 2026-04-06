@@ -3,11 +3,13 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 
-import authRoutes from "@/routes/auth";
-import datosRoutes from "@/routes/datos";
-import bitacorasRoutes from "@/routes/bitacoras";
-import syncRoutes from "@/routes/sync";
-import notificacionesRoutes from "@/routes/notificaciones";
+import {
+  authController,
+  beneficiarioController,
+  bitacoraController,
+  notificacionController,
+  syncController,
+} from "@/controllers";
 
 const app = new Hono();
 
@@ -26,11 +28,20 @@ app.get("/health", (c) =>
   c.json({ status: "ok", service: "api-app", ts: new Date().toISOString() })
 );
 
-app.route("/auth", authRoutes);
-app.route("/", datosRoutes);
-app.route("/bitacoras", bitacorasRoutes);
-app.route("/", syncRoutes);
-app.route("/notificaciones", notificacionesRoutes);
+// Rutas de autenticación
+app.route("/auth", authController);
+
+// Rutas de datos (beneficiarios, actividades, cadenas, localidades)
+app.route("/", beneficiarioController);
+
+// Rutas de bitácoras
+app.route("/bitacoras", bitacoraController);
+
+// Rutas de sincronización
+app.route("/", syncController);
+
+// Rutas de notificaciones
+app.route("/notificaciones", notificacionController);
 
 app.notFound((c) => c.json({ error: "Ruta no encontrada" }, 404));
 app.onError((err, c) => {
