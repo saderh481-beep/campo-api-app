@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { rateLimitMiddleware } from "@/middleware/ratelimit";
+import { authMiddleware } from "@/middleware/auth";
 import { loginTecnico, logoutTecnico } from "@/services/auth.service";
 import type { JwtPayload } from "@/lib/jwt";
 
@@ -38,7 +39,7 @@ app.post(
   }
 );
 
-app.post("/logout", async (c) => {
+app.post("/logout", authMiddleware, async (c) => {
   const tecnico = c.get("tecnico");
   const authHeader = c.req.header("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;

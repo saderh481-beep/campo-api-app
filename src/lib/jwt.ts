@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
+import { env } from "@/config/env";
 
-if (!process.env.JWT_SECRET) throw new Error("[api-app] JWT_SECRET no configurado");
-const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+const secret = new TextEncoder().encode(env.JWT_SECRET);
 
 export type JwtPayload = {
   sub: string;

@@ -1,9 +1,10 @@
 import { v2 as cloudinary, type UploadApiOptions } from "cloudinary";
+import { env } from "@/config/env";
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
-  api_key: process.env.CLOUDINARY_API_KEY!,
-  api_secret: process.env.CLOUDINARY_API_SECRET!,
+  cloud_name: env.CLOUDINARY_CLOUD_NAME,
+  api_key: env.CLOUDINARY_API_KEY,
+  api_secret: env.CLOUDINARY_API_SECRET,
 });
 
 function upload(
@@ -22,7 +23,7 @@ function upload(
 
 export async function subirFotoRostro(buffer: Buffer, bitacoraId: string) {
   return upload(buffer, {
-    upload_preset: process.env.CLOUDINARY_PRESET_IMAGENES,
+    upload_preset: env.CLOUDINARY_PRESET_IMAGENES,
     folder: `campo/rostros/${bitacoraId}`,
     public_id: `rostro-${bitacoraId}`,
     resource_type: "image",
@@ -34,7 +35,7 @@ export async function subirFotoRostro(buffer: Buffer, bitacoraId: string) {
 
 export async function subirFirma(buffer: Buffer, bitacoraId: string) {
   return upload(buffer, {
-    upload_preset: process.env.CLOUDINARY_PRESET_IMAGENES,
+    upload_preset: env.CLOUDINARY_PRESET_IMAGENES,
     folder: `campo/firmas/${bitacoraId}`,
     public_id: `firma-${bitacoraId}`,
     resource_type: "image",
@@ -43,7 +44,7 @@ export async function subirFirma(buffer: Buffer, bitacoraId: string) {
 
 export async function subirFotoCampo(buffer: Buffer, tecnicoId: string, mes: number, index: number) {
   return upload(buffer, {
-    upload_preset: process.env.CLOUDINARY_PRESET_IMAGENES,
+    upload_preset: env.CLOUDINARY_PRESET_IMAGENES,
     folder: `campo/fotos/${tecnicoId}/${mes}`,
     public_id: `foto-${Date.now()}-${index}`,
     resource_type: "image",
@@ -53,7 +54,7 @@ export async function subirFotoCampo(buffer: Buffer, tecnicoId: string, mes: num
 
 export async function subirPdfBitacora(buffer: Buffer, tecnicoId: string, mes: number, bitacoraId: string) {
   return upload(buffer, {
-    upload_preset: process.env.CLOUDINARY_PRESET_DOCS,
+    upload_preset: env.CLOUDINARY_PRESET_DOCS,
     folder: `campo/pdfs/${tecnicoId}/${mes}`,
     public_id: `pdf-${bitacoraId}`,
     resource_type: "raw",

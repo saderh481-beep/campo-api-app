@@ -1,6 +1,8 @@
 services:
   api-app:
     build: .
+    restart: unless-stopped
+    init: true
     ports:
       - "3002:3002"
     env_file:
@@ -10,12 +12,19 @@ services:
     volumes:
       - ./src:/app/src
     command: bun run --watch src/index.ts
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3002/health').then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       redis:
         condition: service_healthy
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:

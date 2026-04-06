@@ -6,12 +6,17 @@ export async function rateLimit(c: Context, next: Next, max = 20, windowSecs = 6
   const route = new URL(c.req.url).pathname;
   const key = `rl:${ip}:${route}`;
 
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, windowSecs);
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, windowSecs);
 
-  if (count > max) {
-    return c.json({ error: "Demasiadas solicitudes, intenta más tarde" }, 429);
+    if (count > max) {
+      return c.json({ error: "Demasiadas solicitudes, intenta más tarde" }, 429);
+    }
+  } catch (error) {
+    console.error("[rateLimit] Redis no disponible:", error);
   }
+
   return next();
 }
 

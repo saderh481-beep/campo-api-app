@@ -18,7 +18,14 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const payload = await verifyJwt(token);
   if (!payload) return c.json({ error: "Token inválido o expirado" }, 401);
 
-  const sessionRaw = await redis.get(`session:${token}`);
+  let sessionRaw: string | null = null;
+  try {
+    sessionRaw = await redis.get(`session:${token}`);
+  } catch (error) {
+    console.error("[auth] No se pudo consultar Redis:", error);
+    return c.json({ error: "Servicio de autenticación no disponible" }, 503);
+  }
+
   if (!sessionRaw) {
     return c.json({ error: "Token inválido o expirado" }, 401);
   }
@@ -30,12 +37,20 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   }
 
   const tecnico = c.get("tecnico");
-  const [tecnicoActual] = await sql`
-    SELECT activo, fecha_limite, estado_corte
-    FROM usuarios
-    WHERE id = ${tecnico.sub}
-    LIMIT 1
-  `;
+  let tecnicoActual:
+    | { activo: boolean | null; fecha_limite: string | Date | null; estado_corte: string | null }
+    | undefined;
+  try {
+    [tecnicoActual] = await sql`
+      SELECT activo, fecha_limite, estado_corte
+      FROM usuarios
+      WHERE id = ${tecnico.sub}
+      LIMIT 1
+    `;
+  } catch (error) {
+    console.error("[auth] No se pudo validar el usuario en base de datos:", error);
+    return c.json({ error: "Servicio de autenticación no disponible" }, 503);
+  }
 
   if (!tecnicoActual || tecnicoActual.activo !== true) {
     return c.json({ error: "Token inválido o expirado" }, 401);
@@ -47,7 +62,11 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const corteAplicado = tecnicoActual.estado_corte && tecnicoActual.estado_corte !== "en_servicio";
 
   if (fechaLimiteVencida || corteAplicado) {
-    await redis.del(`session:${token}`);
+    try {
+      await redis.del(`session:${token}`);
+    } catch (error) {
+      console.error("[auth] No se pudo invalidar la sesión vencida:", error);
+    }
     return c.json({ error: "periodo_vencido" }, 401);
   }
 

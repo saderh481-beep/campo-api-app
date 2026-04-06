@@ -43,6 +43,59 @@ src/
     └── index.ts
 ```
 
+## Variables de entorno
+
+Para desarrollo local puedes usar [`.env`](c:/App/campo-api-app1/.env). Para producción toma como base [`.env.production.example`](c:/App/campo-api-app1/.env.production.example).
+
+Variables requeridas:
+
+- `NODE_ENV`
+- `PORT`
+- `DATABASE_URL`
+- `REDIS_URL`
+- `JWT_SECRET`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `CLOUDINARY_PRESET_IMAGENES`
+- `CLOUDINARY_PRESET_DOCS`
+- `CORS_ORIGIN`
+
+Notas:
+
+- `JWT_SECRET` debe tener al menos 32 caracteres.
+- En producción no dependas del `.env` local; configura las variables en Railway.
+- `CORS_ORIGIN` acepta uno o varios dominios separados por comas.
+
+## Docker
+
+Desarrollo local:
+
+```bash
+docker compose up --build
+```
+
+El servicio `api-app` ahora expone un healthcheck contra `GET /health`, y Redis también tiene healthcheck configurado.
+
+## Despliegue en Railway
+
+Checklist mínima de producción:
+
+1. Crear el servicio desde este repositorio usando el `Dockerfile`.
+2. Definir estas variables en Railway usando [`.env.production.example`](c:/App/campo-api-app1/.env.production.example) como plantilla.
+3. Confirmar que `JWT_SECRET` sea único, largo y no reutilizado entre ambientes.
+4. Provisionar Postgres y Redis, y copiar sus URLs reales en `DATABASE_URL` y `REDIS_URL`.
+5. Configurar `CORS_ORIGIN` con el dominio real del frontend.
+6. Verificar que `GET /health` responda `200` después del deploy.
+7. Probar al menos `POST /auth/tecnico`, `GET /mis-beneficiarios` y una ruta protegida con token.
+8. Revisar logs del servicio si Railway reinicia el contenedor más de una vez.
+
+Recomendaciones:
+
+- No subas secretos al repositorio.
+- Usa una base y un Redis distintos por ambiente.
+- Si cambias variables críticas, fuerza un redeploy del servicio.
+
 ## Flujo funcional esperado
 
 1. El técnico inicia sesión con código de acceso de 5 dígitos.
