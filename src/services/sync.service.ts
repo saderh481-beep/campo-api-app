@@ -13,7 +13,15 @@ export async function sincronizarOperaciones(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  const resultados: { sync_id?: string; operacion: string; exito: boolean; error?: string }[] = [];
+  const resultados: {
+    sync_id?: string;
+    bitacora_id?: string;
+    operacion: string;
+    exito: boolean;
+    estado?: string;
+    updated_at?: string;
+    error?: string;
+  }[] = [];
 
   for (const op of ordenadas) {
     try {
@@ -21,26 +29,46 @@ export async function sincronizarOperaciones(
         const p = op.payload;
 
         if (!p.sync_id) throw new Error("sync_id requerido");
-        const [existente] = await sql`SELECT id FROM bitacoras WHERE sync_id = ${String(p.sync_id)}`;
+        const [existente] = await sql<BitacoraResumen[]>`
+          SELECT id, estado, sync_id, fecha_inicio, fecha_fin
+          FROM bitacoras
+          WHERE sync_id = ${String(p.sync_id)}
+            AND tecnico_id = ${tecnicoId}
+        `;
         if (existente) {
-          resultados.push({ sync_id: String(p.sync_id), operacion: op.operacion, exito: true });
+          resultados.push({
+            sync_id: String(p.sync_id),
+            bitacora_id: existente.id,
+            operacion: op.operacion,
+            exito: true,
+            estado: existente.estado,
+          });
           continue;
         }
 
-        await sql`
+        const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           INSERT INTO bitacoras (
-            tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id,
+            tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id, creada_offline,
             beneficiario_id, cadena_productiva_id, actividad_id
           ) VALUES (
             ${tecnicoId}, ${String(p.tipo)}, 'borrador', ${String(p.fecha_inicio)},
             ${(p.coord_inicio as string | null) ?? null},
             ${String(p.sync_id)},
+            true,
             ${(p.beneficiario_id as string | null) ?? null},
             ${(p.cadena_productiva_id as string | null) ?? null},
             ${(p.actividad_id as string | null) ?? null}
           )
+          RETURNING id, estado, updated_at
         `;
-        resultados.push({ sync_id: String(p.sync_id), operacion: op.operacion, exito: true });
+        resultados.push({
+          sync_id: String(p.sync_id),
+          bitacora_id: creada.id,
+          operacion: op.operacion,
+          exito: true,
+          estado: creada.estado,
+          updated_at: creada.updated_at,
+        });
 
       } else if (op.operacion === "editar_bitacora") {
         const p = op.payload;
@@ -52,7 +80,7 @@ export async function sincronizarOperaciones(
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
 
-        await sql`
+        const [actualizada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           UPDATE bitacoras SET
             actividades_desc = COALESCE(${(p.actividades_desc as string | null) ?? null}, actividades_desc),
             coord_inicio = COALESCE(${(p.coord_inicio as string | null) ?? null}, coord_inicio),
@@ -63,8 +91,17 @@ export async function sincronizarOperaciones(
             comentarios_beneficiario = COALESCE(${(p.comentarios_beneficiario as string | null) ?? null}, comentarios_beneficiario),
             updated_at = NOW()
           WHERE sync_id = ${String(p.sync_id)}
+            AND tecnico_id = ${tecnicoId}
+          RETURNING id, estado, updated_at
         `;
-        resultados.push({ sync_id: String(p.sync_id), operacion: op.operacion, exito: true });
+        resultados.push({
+          sync_id: String(p.sync_id),
+          bitacora_id: actualizada.id,
+          operacion: op.operacion,
+          exito: true,
+          estado: actualizada.estado,
+          updated_at: actualizada.updated_at,
+        });
 
       } else if (op.operacion === "cerrar_bitacora") {
         const p = op.payload;
@@ -76,15 +113,24 @@ export async function sincronizarOperaciones(
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("La bitácora ya está cerrada");
 
-        await sql`
+        const [cerrada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           UPDATE bitacoras SET
             estado = 'cerrada',
             fecha_fin = ${String(p.fecha_fin)},
             coord_fin = ${(p.coord_fin as string | null) ?? null},
             updated_at = NOW()
           WHERE sync_id = ${String(p.sync_id)}
+            AND tecnico_id = ${tecnicoId}
+          RETURNING id, estado, updated_at
         `;
-        resultados.push({ sync_id: String(p.sync_id), operacion: op.operacion, exito: true });
+        resultados.push({
+          sync_id: String(p.sync_id),
+          bitacora_id: cerrada.id,
+          operacion: op.operacion,
+          exito: true,
+          estado: cerrada.estado,
+          updated_at: cerrada.updated_at,
+        });
 
       } else {
         resultados.push({ operacion: op.operacion, exito: false, error: "Operación no soportada" });
@@ -104,7 +150,7 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
     return { error: "Formato de fecha inválido. Usa ISO 8601, ej: 2026-03-01T00:00:00Z" };
   }
 
-  const [beneficiarios, actividades, cadenas] = await Promise.all([
+  const [beneficiarios, actividades, cadenas, localidades, bitacoras] = await Promise.all([
     sql`
       SELECT DISTINCT b.id, b.nombre, b.municipio, b.localidad, b.updated_at
       FROM beneficiarios b
@@ -126,6 +172,21 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
       FROM cadenas_productivas
       WHERE activo = true AND updated_at > ${desde.toISOString()}
     `,
+    sql`
+      SELECT id, municipio, nombre, cp, updated_at
+      FROM localidades
+      WHERE activo = true AND updated_at > ${desde.toISOString()}
+      ORDER BY municipio, nombre
+    `,
+    sql`
+      SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
+             actividades_desc, recomendaciones, comentarios_beneficiario,
+             foto_rostro_url, firma_url, fotos_campo, pdf_url_actual, updated_at
+      FROM bitacoras
+      WHERE tecnico_id = ${tecnicoId}
+        AND updated_at > ${desde.toISOString()}
+      ORDER BY updated_at ASC
+    `,
   ]);
 
   return {
@@ -133,5 +194,7 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
     beneficiarios,
     actividades,
     cadenas,
+    localidades,
+    bitacoras,
   };
 }

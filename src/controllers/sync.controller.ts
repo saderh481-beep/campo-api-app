@@ -30,15 +30,50 @@ const schemaBitacoraTipoB = z.object({
   sync_id: z.string(),
 });
 
-const schemaOperacion = z.object({
-  operacion: z.enum(["crear_bitacora", "cerrar_bitacora", "editar_bitacora"]),
-  timestamp: z.string().datetime(),
-  payload: z.union([schemaBitacoraTipoA, schemaBitacoraTipoB]),
+const schemaCrearBitacoraPayload = z.union([schemaBitacoraTipoA, schemaBitacoraTipoB]);
+
+const schemaEditarBitacoraPayload = z.object({
+  sync_id: z.string(),
+  actividades_desc: z.string().optional(),
+  coord_inicio: z.string().optional(),
+  coord_fin: z.string().optional(),
+  fecha_inicio: z.string().datetime().optional(),
+  fecha_fin: z.string().datetime().optional(),
+  recomendaciones: z.string().optional(),
+  comentarios_beneficiario: z.string().optional(),
+});
+
+const schemaCerrarBitacoraPayload = z.object({
+  sync_id: z.string(),
+  fecha_fin: z.string().datetime(),
+  coord_fin: z.string().optional(),
+});
+
+const schemaOperacion = z.discriminatedUnion("operacion", [
+  z.object({
+    operacion: z.literal("crear_bitacora"),
+    timestamp: z.string().datetime(),
+    payload: schemaCrearBitacoraPayload,
+  }),
+  z.object({
+    operacion: z.literal("editar_bitacora"),
+    timestamp: z.string().datetime(),
+    payload: schemaEditarBitacoraPayload,
+  }),
+  z.object({
+    operacion: z.literal("cerrar_bitacora"),
+    timestamp: z.string().datetime(),
+    payload: schemaCerrarBitacoraPayload,
+  }),
+]);
+
+const schemaSyncRequest = z.object({
+  operaciones: z.array(schemaOperacion),
 });
 
 app.post(
   "/sync",
-  zValidator("json", z.object({ operaciones: z.array(schemaOperacion) })),
+  zValidator("json", schemaSyncRequest),
   async (c) => {
     const tecnico = c.get("tecnico");
     const { operaciones } = c.req.valid("json");

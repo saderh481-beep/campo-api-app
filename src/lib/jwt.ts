@@ -1,7 +1,10 @@
 import { SignJWT, jwtVerify } from "jose";
-import { env } from "@/config/env";
+import { requireEnv } from "@/config/env";
 
-const secret = new TextEncoder().encode(env.JWT_SECRET);
+function getSecret() {
+  const jwtSecret = requireEnv("JWT_SECRET", { minLength: 32 });
+  return new TextEncoder().encode(jwtSecret);
+}
 
 export type JwtPayload = {
   sub: string;
@@ -14,12 +17,12 @@ export async function signJwt(payload: JwtPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .sign(secret);
+    .sign(getSecret());
 }
 
 export async function verifyJwt(token: string): Promise<JwtPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, getSecret());
     return payload as unknown as JwtPayload;
   } catch {
     return null;
