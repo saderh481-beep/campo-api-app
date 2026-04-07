@@ -3,30 +3,55 @@ import { redis } from "@/lib/redis";
 import type { BeneficiarioConCadenas, Actividad, CadenaProductiva, Localidad } from "@/models";
 
 export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
-  const beneficiarios = await sql<BeneficiarioConCadenas[]>`
+  try {
+    return await sql<BeneficiarioConCadenas[]>`
+      SELECT b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
+             b.telefono_principal, b.telefono_secundario,
+             CASE
+               WHEN b.coord_parcela IS NULL THEN NULL
+               ELSE CONCAT('(', b.coord_parcela[0], ',', b.coord_parcela[1], ')')
+             END AS coord_parcela,
+             b.activo,
+             COALESCE((
+               SELECT json_agg(json_build_object('id', cp.id, 'nombre', cp.nombre) ORDER BY cp.nombre)
+               FROM beneficiario_cadenas bc
+               JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
+               WHERE bc.beneficiario_id = b.id
+                 AND bc.activo = true
+                 AND cp.activo = true
+             ), '[]'::json) AS cadenas
+      FROM asignaciones_beneficiario ab
+      JOIN beneficiarios b ON b.id = ab.beneficiario_id
+      WHERE ab.tecnico_id = ${tecnicoId}
+        AND ab.activo = true
+        AND b.activo = true
+      ORDER BY b.nombre
+    `;
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "42703") {
+      throw error;
+    }
+  }
+
+  return await sql<BeneficiarioConCadenas[]>`
     SELECT b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
            b.telefono_principal, b.telefono_secundario,
            CASE
              WHEN b.coord_parcela IS NULL THEN NULL
              ELSE CONCAT('(', b.coord_parcela[0], ',', b.coord_parcela[1], ')')
            END AS coord_parcela,
-           b.activo,
+           true AS activo,
            COALESCE((
              SELECT json_agg(json_build_object('id', cp.id, 'nombre', cp.nombre) ORDER BY cp.nombre)
              FROM beneficiario_cadenas bc
              JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
              WHERE bc.beneficiario_id = b.id
-               AND bc.activo = true
-               AND cp.activo = true
            ), '[]'::json) AS cadenas
     FROM asignaciones_beneficiario ab
     JOIN beneficiarios b ON b.id = ab.beneficiario_id
     WHERE ab.tecnico_id = ${tecnicoId}
-      AND ab.activo = true
-      AND b.activo = true
     ORDER BY b.nombre
   `;
-  return beneficiarios;
 }
 
 export async function crearBeneficiario(
@@ -123,14 +148,24 @@ export async function obtenerActividadesTecnico(tecnicoId: string) {
 }
 
 export async function obtenerCadenasProductivas() {
-  const cached = await redis.get("cadenas:lista");
-  if (cached) return JSON.parse(cached);
+  try {
+    const cached = await redis.get("cadenas:lista");
+    if (cached) return JSON.parse(cached);
+  } catch (error) {
+    console.error("[beneficiarios] No se pudo leer cache Redis:", error);
+  }
 
   const cadenas = await sql<CadenaProductiva[]>`
     SELECT id, nombre, descripcion, activo, created_by, created_at, updated_at 
     FROM cadenas_productivas WHERE activo = true ORDER BY nombre
   `;
-  await redis.setex("cadenas:lista", 86400, JSON.stringify(cadenas));
+
+  try {
+    await redis.setex("cadenas:lista", 86400, JSON.stringify(cadenas));
+  } catch (error) {
+    console.error("[beneficiarios] No se pudo escribir cache Redis:", error);
+  }
+
   return cadenas;
 }
 

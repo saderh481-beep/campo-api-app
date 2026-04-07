@@ -93,6 +93,35 @@ async function obtenerTecnicosPorCodigo(codigoNormalizado: string) {
   `;
 }
 
+async function registrarAuthLog(
+  tecnicoId: string,
+  accion: "login" | "logout",
+  ip?: string | null,
+  userAgent?: string | null
+) {
+  try {
+    await sql`
+      INSERT INTO auth_logs (actor_id, actor_tipo, accion, ip, user_agent)
+      VALUES (${tecnicoId}, 'tecnico', ${accion}, ${ip ?? null}, ${userAgent ?? null})
+    `;
+    return;
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "42703") {
+      console.error("[auth] No se pudo registrar auth_log completo:", error);
+      return;
+    }
+  }
+
+  try {
+    await sql`
+      INSERT INTO auth_logs (actor_id, actor_tipo, accion)
+      VALUES (${tecnicoId}, 'tecnico', ${accion})
+    `;
+  } catch (error) {
+    console.error("[auth] No se pudo registrar auth_log:", error);
+  }
+}
+
 export async function loginTecnico(codigo: string, ip?: string, userAgent?: string) {
   const codigoNormalizado = normalizarCodigo(codigo);
 
@@ -141,11 +170,7 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
     console.error("[auth] No se pudo guardar la sesión en Redis:", error);
   }
 
-  // Registrar log de autenticación
-  await sql`
-    INSERT INTO auth_logs (actor_id, actor_tipo, accion, ip, user_agent)
-    VALUES (${tecnico.id}, 'tecnico', 'login', ${ip ?? null}, ${userAgent ?? null})
-  `;
+  await registrarAuthLog(tecnico.id, "login", ip ?? null, userAgent ?? null);
 
   return {
     success: true,
@@ -161,10 +186,7 @@ export async function logoutTecnico(token: string, tecnicoId: string) {
     console.error("[auth] No se pudo eliminar la sesión en Redis:", error);
   }
 
-  await sql`
-    INSERT INTO auth_logs (actor_id, actor_tipo, accion)
-    VALUES (${tecnicoId}, 'tecnico', 'logout')
-  `;
+  await registrarAuthLog(tecnicoId, "logout");
 
   return { success: true };
 }
