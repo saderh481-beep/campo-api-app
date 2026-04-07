@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
 import {
+  obtenerAsignacionesTecnico,
   obtenerBeneficiariosTecnico,
   crearBeneficiario,
   obtenerActividadesTecnico,
@@ -25,6 +26,12 @@ const schemaCrearBeneficiario = z.object({
   localidad: z.string().trim().min(1),
   telefono_contacto: z.string().trim().min(1),
   cadena_productiva: z.string().trim().min(1).optional(),
+});
+
+app.get("/asignaciones", async (c) => {
+  const tecnico = c.get("tecnico");
+  const asignaciones = await obtenerAsignacionesTecnico(tecnico.sub);
+  return c.json(asignaciones);
 });
 
 app.get("/mis-beneficiarios", async (c) => {

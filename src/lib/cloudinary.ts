@@ -1,7 +1,15 @@
 import { v2 as cloudinary, type UploadApiOptions } from "cloudinary";
-import { requireEnv } from "@/config/env";
+import { env, requireEnv } from "@/config/env";
 
 let configured = false;
+
+function cloudinaryEnvConfigured() {
+  return Boolean(
+    env.CLOUDINARY_CLOUD_NAME?.trim() &&
+      env.CLOUDINARY_API_KEY?.trim() &&
+      env.CLOUDINARY_API_SECRET?.trim()
+  );
+}
 
 function ensureCloudinaryConfigured() {
   if (configured) return;
@@ -15,10 +23,22 @@ function ensureCloudinaryConfigured() {
   configured = true;
 }
 
+function buildDataUrl(buffer: Buffer, mimeType: string) {
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+}
+
 function upload(
   buffer: Buffer,
-  options: UploadApiOptions
+  options: UploadApiOptions,
+  fallbackMimeType: string
 ): Promise<{ secure_url: string; public_id: string }> {
+  if (!cloudinaryEnvConfigured()) {
+    return Promise.resolve({
+      secure_url: buildDataUrl(buffer, fallbackMimeType),
+      public_id: String(options.public_id ?? `local-${Date.now()}`),
+    });
+  }
+
   ensureCloudinaryConfigured();
 
   return new Promise((resolve, reject) => {
@@ -40,7 +60,7 @@ export async function subirFotoRostro(buffer: Buffer, bitacoraId: string) {
     transformation: [
       { width: 400, height: 400, crop: "fill", gravity: "face", quality: 80, fetch_format: "webp" },
     ],
-  });
+  }, "image/webp");
 }
 
 export async function subirFirma(buffer: Buffer, bitacoraId: string) {
@@ -49,7 +69,7 @@ export async function subirFirma(buffer: Buffer, bitacoraId: string) {
     folder: `campo/firmas/${bitacoraId}`,
     public_id: `firma-${bitacoraId}`,
     resource_type: "image",
-  });
+  }, "image/png");
 }
 
 export async function subirFotoCampo(buffer: Buffer, tecnicoId: string, mes: number, index: number) {
@@ -59,7 +79,7 @@ export async function subirFotoCampo(buffer: Buffer, tecnicoId: string, mes: num
     public_id: `foto-${Date.now()}-${index}`,
     resource_type: "image",
     transformation: [{ width: 1200, quality: 75, fetch_format: "webp" }],
-  });
+  }, "image/webp");
 }
 
 export async function subirPdfBitacora(buffer: Buffer, tecnicoId: string, mes: number, bitacoraId: string) {
@@ -68,5 +88,5 @@ export async function subirPdfBitacora(buffer: Buffer, tecnicoId: string, mes: n
     folder: `campo/pdfs/${tecnicoId}/${mes}`,
     public_id: `pdf-${bitacoraId}`,
     resource_type: "raw",
-  });
+  }, "application/pdf");
 }

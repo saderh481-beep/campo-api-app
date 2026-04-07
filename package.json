@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:init": "bun run scripts/init-db.ts",
+    "db:seed": "bun run scripts/seed-dev.ts",
+    "db:setup": "bun run scripts/init-db.ts && bun run scripts/seed-dev.ts",
+    "db:inspect": "bun run scripts/ver-estructura-db.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.6",

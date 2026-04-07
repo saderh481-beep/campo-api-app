@@ -35,3 +35,14 @@ export interface TecnicoDetalle {
   created_at: string;
   updated_at: string;
 }
+
+export interface AsignacionBeneficiarioDetalle extends AsignacionBeneficiario {
+  beneficiario_nombre: string;
+  municipio: string;
+  localidad: string | null;
+}
+
+export interface AsignacionActividadDetalle extends AsignacionActividad {
+  actividad_nombre: string;
+  actividad_descripcion: string | null;
+}

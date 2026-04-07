@@ -76,6 +76,18 @@ docker compose up --build
 ```
 
 El servicio `api-app` ahora expone un healthcheck contra `GET /health`, y Redis también tiene healthcheck configurado.
+Para dejar la base lista por primera vez:
+
+```bash
+npm run db:init
+npm run db:seed
+```
+
+Si prefieres hacerlo en un solo paso:
+
+```bash
+npm run db:setup
+```
 
 ## Despliegue en Railway
 
@@ -219,6 +231,43 @@ Respuesta 200:
     ]
   }
 ]
+```
+
+#### GET /asignaciones
+
+Respuesta 200:
+
+```json
+{
+  "tecnico_id": "uuid",
+  "beneficiarios": [
+    {
+      "id": "uuid",
+      "tecnico_id": "uuid",
+      "beneficiario_id": "uuid",
+      "activo": true,
+      "asignado_por": "uuid|null",
+      "asignado_en": "timestamp",
+      "removido_en": "timestamp|null",
+      "beneficiario_nombre": "string",
+      "municipio": "string",
+      "localidad": "string|null"
+    }
+  ],
+  "actividades": [
+    {
+      "id": "uuid",
+      "tecnico_id": "uuid",
+      "actividad_id": "uuid",
+      "activo": true,
+      "asignado_por": "uuid|null",
+      "asignado_en": "timestamp",
+      "removido_en": "timestamp|null",
+      "actividad_nombre": "string",
+      "actividad_descripcion": "string|null"
+    }
+  ]
+}
 ```
 
 #### POST /beneficiarios
@@ -599,6 +648,8 @@ Respuesta 200:
   "resultados": [
     {
       "sync_id": "uuid",
+      "remote_id": "uuid",
+      "entidad": "bitacora",
       "operacion": "crear_bitacora",
       "exito": true
     }
@@ -639,6 +690,30 @@ Respuesta 200:
       "descripcion": "string|null",
       "updated_at": "timestamp"
     }
+  ],
+  "asignaciones": {
+    "beneficiarios": [
+      {
+        "id": "uuid",
+        "tecnico_id": "uuid",
+        "beneficiario_id": "uuid",
+        "activo": true,
+        "asignado_por": "uuid|null",
+        "asignado_en": "timestamp",
+        "removido_en": "timestamp|null"
+      }
+    ],
+    "actividades": [
+      {
+        "id": "uuid",
+        "tecnico_id": "uuid",
+        "actividad_id": "uuid",
+        "activo": true,
+        "asignado_por": "uuid|null",
+        "asignado_en": "timestamp",
+        "removido_en": "timestamp|null"
+      }
+    ]
   ]
 }
 ```
@@ -702,3 +777,13 @@ bun run scripts/ver-estructura-db.ts
 | pdf_versiones | Versiones de PDF al cerrar bitácora | ✅ |
 | auth_logs | Auditoría de accesos | ✅ |
 | localidades | Catálogo para formularios | ✅ |
+
+## Datos de desarrollo
+
+Después de correr `npm run db:seed`, puedes iniciar sesión con:
+
+- `tecnico1@campo.local` usando código `12345`
+- `tecnico2@campo.local` usando código `12346`
+- `coordinador@campo.local` usando código `900001`
+
+Si Cloudinary no está configurado en desarrollo, las subidas de evidencias usan `data:` URLs locales para no bloquear el flujo de bitácoras.

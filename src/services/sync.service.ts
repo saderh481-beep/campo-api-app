@@ -16,6 +16,8 @@ export async function sincronizarOperaciones(
   const resultados: {
     sync_id?: string;
     bitacora_id?: string;
+    remote_id?: string;
+    entidad?: string;
     operacion: string;
     exito: boolean;
     estado?: string;
@@ -39,6 +41,8 @@ export async function sincronizarOperaciones(
           resultados.push({
             sync_id: String(p.sync_id),
             bitacora_id: existente.id,
+            remote_id: existente.id,
+            entidad: "bitacora",
             operacion: op.operacion,
             exito: true,
             estado: existente.estado,
@@ -64,6 +68,8 @@ export async function sincronizarOperaciones(
         resultados.push({
           sync_id: String(p.sync_id),
           bitacora_id: creada.id,
+          remote_id: creada.id,
+          entidad: "bitacora",
           operacion: op.operacion,
           exito: true,
           estado: creada.estado,
@@ -97,6 +103,8 @@ export async function sincronizarOperaciones(
         resultados.push({
           sync_id: String(p.sync_id),
           bitacora_id: actualizada.id,
+          remote_id: actualizada.id,
+          entidad: "bitacora",
           operacion: op.operacion,
           exito: true,
           estado: actualizada.estado,
@@ -126,6 +134,8 @@ export async function sincronizarOperaciones(
         resultados.push({
           sync_id: String(p.sync_id),
           bitacora_id: cerrada.id,
+          remote_id: cerrada.id,
+          entidad: "bitacora",
           operacion: op.operacion,
           exito: true,
           estado: cerrada.estado,
@@ -150,7 +160,15 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
     return { error: "Formato de fecha inválido. Usa ISO 8601, ej: 2026-03-01T00:00:00Z" };
   }
 
-  const [beneficiarios, actividades, cadenas, localidades, bitacoras] = await Promise.all([
+  const [
+    beneficiarios,
+    actividades,
+    cadenas,
+    localidades,
+    bitacoras,
+    asignacionesBeneficiario,
+    asignacionesActividad,
+  ] = await Promise.all([
     sql`
       SELECT DISTINCT b.id, b.nombre, b.municipio, b.localidad, b.updated_at
       FROM beneficiarios b
@@ -187,6 +205,40 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
         AND updated_at > ${desde.toISOString()}
       ORDER BY updated_at ASC
     `,
+    sql`
+      SELECT
+        ab.id,
+        ab.tecnico_id,
+        ab.beneficiario_id,
+        ab.activo,
+        ab.asignado_por,
+        ab.asignado_en,
+        ab.removido_en
+      FROM asignaciones_beneficiario ab
+      WHERE ab.tecnico_id = ${tecnicoId}
+        AND GREATEST(
+          COALESCE(ab.asignado_en, TIMESTAMP 'epoch'),
+          COALESCE(ab.removido_en, TIMESTAMP 'epoch')
+        ) > ${desde.toISOString()}
+      ORDER BY ab.asignado_en ASC
+    `,
+    sql`
+      SELECT
+        aa.id,
+        aa.tecnico_id,
+        aa.actividad_id,
+        aa.activo,
+        aa.asignado_por,
+        aa.asignado_en,
+        aa.removido_en
+      FROM asignaciones_actividad aa
+      WHERE aa.tecnico_id = ${tecnicoId}
+        AND GREATEST(
+          COALESCE(aa.asignado_en, TIMESTAMP 'epoch'),
+          COALESCE(aa.removido_en, TIMESTAMP 'epoch')
+        ) > ${desde.toISOString()}
+      ORDER BY aa.asignado_en ASC
+    `,
   ]);
 
   return {
@@ -196,5 +248,9 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
     cadenas,
     localidades,
     bitacoras,
+    asignaciones: {
+      beneficiarios: asignacionesBeneficiario,
+      actividades: asignacionesActividad,
+    },
   };
 }

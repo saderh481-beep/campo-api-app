@@ -1,6 +1,59 @@
 import { sql } from "@/db";
 import { redis } from "@/lib/redis";
-import type { BeneficiarioConCadenas, Actividad, CadenaProductiva, Localidad } from "@/models";
+import type {
+  BeneficiarioConCadenas,
+  Actividad,
+  CadenaProductiva,
+  Localidad,
+  AsignacionBeneficiarioDetalle,
+  AsignacionActividadDetalle,
+} from "@/models";
+
+export async function obtenerAsignacionesTecnico(tecnicoId: string) {
+  const [beneficiarios, actividades] = await Promise.all([
+    sql<AsignacionBeneficiarioDetalle[]>`
+      SELECT
+        ab.id,
+        ab.tecnico_id,
+        ab.beneficiario_id,
+        ab.activo,
+        ab.asignado_por,
+        ab.asignado_en,
+        ab.removido_en,
+        b.nombre AS beneficiario_nombre,
+        b.municipio,
+        b.localidad
+      FROM asignaciones_beneficiario ab
+      JOIN beneficiarios b ON b.id = ab.beneficiario_id
+      WHERE ab.tecnico_id = ${tecnicoId}
+        AND ab.activo = true
+      ORDER BY ab.asignado_en DESC, b.nombre ASC
+    `,
+    sql<AsignacionActividadDetalle[]>`
+      SELECT
+        aa.id,
+        aa.tecnico_id,
+        aa.actividad_id,
+        aa.activo,
+        aa.asignado_por,
+        aa.asignado_en,
+        aa.removido_en,
+        a.nombre AS actividad_nombre,
+        a.descripcion AS actividad_descripcion
+      FROM asignaciones_actividad aa
+      JOIN actividades a ON a.id = aa.actividad_id
+      WHERE aa.tecnico_id = ${tecnicoId}
+        AND aa.activo = true
+      ORDER BY aa.asignado_en DESC, a.nombre ASC
+    `,
+  ]);
+
+  return {
+    tecnico_id: tecnicoId,
+    beneficiarios,
+    actividades,
+  };
+}
 
 export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
   try {
