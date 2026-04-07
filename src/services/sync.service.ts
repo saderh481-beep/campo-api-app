@@ -14,6 +14,7 @@ export async function sincronizarOperaciones(
   );
 
   const resultados: {
+    id?: string;
     sync_id?: string;
     bitacora_id?: string;
     remote_id?: string;
@@ -40,6 +41,7 @@ export async function sincronizarOperaciones(
         if (existente) {
           resultados.push({
             sync_id: String(p.sync_id),
+            id: existente.id,
             bitacora_id: existente.id,
             remote_id: existente.id,
             entidad: "bitacora",
@@ -55,7 +57,7 @@ export async function sincronizarOperaciones(
             tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id, creada_offline,
             beneficiario_id, cadena_productiva_id, actividad_id
           ) VALUES (
-            ${tecnicoId}, ${String(p.tipo)}, 'borrador', ${String(p.fecha_inicio)},
+            ${tecnicoId}, ${String(p.tipo)}, 'borrador', ${String((p.fecha_inicio as string | null) ?? op.timestamp)},
             ${(p.coord_inicio as string | null) ?? null},
             ${String(p.sync_id)},
             true,
@@ -67,6 +69,7 @@ export async function sincronizarOperaciones(
         `;
         resultados.push({
           sync_id: String(p.sync_id),
+          id: creada.id,
           bitacora_id: creada.id,
           remote_id: creada.id,
           entidad: "bitacora",
@@ -102,6 +105,7 @@ export async function sincronizarOperaciones(
         `;
         resultados.push({
           sync_id: String(p.sync_id),
+          id: actualizada.id,
           bitacora_id: actualizada.id,
           remote_id: actualizada.id,
           entidad: "bitacora",
@@ -133,6 +137,7 @@ export async function sincronizarOperaciones(
         `;
         resultados.push({
           sync_id: String(p.sync_id),
+          id: cerrada.id,
           bitacora_id: cerrada.id,
           remote_id: cerrada.id,
           entidad: "bitacora",

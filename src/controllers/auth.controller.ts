@@ -33,6 +33,7 @@ app.post(
     }
 
     return c.json({
+      success: true,
       token: resultado.token,
       tecnico: resultado.tecnico,
     });

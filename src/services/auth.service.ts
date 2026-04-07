@@ -240,7 +240,7 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
   return {
     success: true,
     token,
-    tecnico: { id: tecnico.id, nombre: tecnico.nombre },
+    tecnico: { id: tecnico.id, nombre: tecnico.nombre, rol: "tecnico" },
   };
 }
 

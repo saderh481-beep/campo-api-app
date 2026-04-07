@@ -17,7 +17,7 @@ const schemaBitacoraTipoA = z.object({
   tipo: z.literal("beneficiario"),
   beneficiario_id: z.string().uuid(),
   cadena_productiva_id: z.string().uuid().optional(),
-  fecha_inicio: z.string().datetime(),
+  fecha_inicio: z.string().datetime().optional(),
   coord_inicio: z.string().optional(),
   sync_id: z.string(),
 });
@@ -25,7 +25,7 @@ const schemaBitacoraTipoA = z.object({
 const schemaBitacoraTipoB = z.object({
   tipo: z.literal("actividad"),
   actividad_id: z.string().uuid(),
-  fecha_inicio: z.string().datetime(),
+  fecha_inicio: z.string().datetime().optional(),
   coord_inicio: z.string().optional(),
   sync_id: z.string(),
 });

@@ -4,8 +4,8 @@ import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
 import {
-  obtenerAsignacionesTecnico,
-  obtenerBeneficiariosTecnico,
+  obtenerAsignacionesTecnicoParaApp,
+  obtenerBeneficiariosTecnicoParaApp,
   crearBeneficiario,
   obtenerActividadesTecnico,
   obtenerCadenasProductivas,
@@ -22,21 +22,23 @@ app.use("*", authMiddleware);
 
 const schemaCrearBeneficiario = z.object({
   nombre_completo: z.string().trim().min(1),
+  curp: z.string().trim().min(1).optional(),
   municipio: z.string().trim().min(1),
   localidad: z.string().trim().min(1),
+  folio_saderh: z.string().trim().min(1).optional(),
   telefono_contacto: z.string().trim().min(1),
   cadena_productiva: z.string().trim().min(1).optional(),
 });
 
 app.get("/asignaciones", async (c) => {
   const tecnico = c.get("tecnico");
-  const asignaciones = await obtenerAsignacionesTecnico(tecnico.sub);
+  const asignaciones = await obtenerAsignacionesTecnicoParaApp(tecnico.sub);
   return c.json(asignaciones);
 });
 
 app.get("/mis-beneficiarios", async (c) => {
   const tecnico = c.get("tecnico");
-  const beneficiarios = await obtenerBeneficiariosTecnico(tecnico.sub);
+  const beneficiarios = await obtenerBeneficiariosTecnicoParaApp(tecnico.sub);
   return c.json(beneficiarios);
 });
 
@@ -50,9 +52,20 @@ app.post("/beneficiarios", zValidator("json", schemaCrearBeneficiario), async (c
     localidad: body.localidad,
     telefono: body.telefono_contacto,
     cadena_productiva: body.cadena_productiva,
+    curp: body.curp,
+    folio_saderh: body.folio_saderh,
   });
 
-  return c.json(beneficiario, 201);
+  return c.json(
+    {
+      success: true,
+      data: {
+        id: beneficiario.id,
+        nombre: beneficiario.nombre,
+      },
+    },
+    201
+  );
 });
 
 app.get("/mis-actividades", async (c) => {

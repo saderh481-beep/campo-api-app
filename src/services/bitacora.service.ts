@@ -52,15 +52,16 @@ export async function crearBitacora(
 
 export async function obtenerBitacorasTecnico(
   tecnicoId: string,
-  options: { limit?: number; offset?: number } = {}
+  options: { limit?: number; offset?: number; estado?: string } = {}
 ) {
-  const { limit = 50, offset = 0 } = options;
+  const { limit = 50, offset = 0, estado } = options;
   const ahora = new Date();
 
-  const bitacoras = await sql<BitacoraResumen[]>`
-    SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
+  const bitacoras = await sql<Bitacora[]>`
+    SELECT *
     FROM bitacoras
     WHERE tecnico_id = ${tecnicoId}
+      AND (${estado ?? null} IS NULL OR estado = ${estado ?? null})
       AND EXTRACT(MONTH FROM fecha_inicio) = ${ahora.getMonth() + 1}
       AND EXTRACT(YEAR FROM fecha_inicio) = ${ahora.getFullYear()}
     ORDER BY fecha_inicio DESC

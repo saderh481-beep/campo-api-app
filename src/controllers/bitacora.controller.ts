@@ -57,18 +57,19 @@ app.post("/", zValidator("json", schemaBitacora), async (c) => {
   });
 
   if ("duplicado" in resultado && resultado.duplicado) {
-    return c.json(resultado, 200);
+    return c.json({ id: resultado.id }, 200);
   }
 
-  return c.json(resultado, 201);
+  return c.json({ id: resultado.id }, 201);
 });
 
 app.get("/", async (c) => {
   const tecnico = c.get("tecnico");
   const limit = parseInt(c.req.query("limit") ?? "50");
   const offset = parseInt(c.req.query("offset") ?? "0");
+  const estado = c.req.query("estado") ?? undefined;
 
-  const bitacoras = await obtenerBitacorasTecnico(tecnico.sub, { limit, offset });
+  const bitacoras = await obtenerBitacorasTecnico(tecnico.sub, { limit, offset, estado });
   return c.json(bitacoras);
 });
 

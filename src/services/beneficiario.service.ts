@@ -55,6 +55,81 @@ export async function obtenerAsignacionesTecnico(tecnicoId: string) {
   };
 }
 
+function cadenaPrincipal(beneficiario: BeneficiarioConCadenas) {
+  return Array.isArray(beneficiario.cadenas) && beneficiario.cadenas.length > 0
+    ? beneficiario.cadenas[0]?.nombre ?? null
+    : null;
+}
+
+export async function obtenerAsignacionesTecnicoParaApp(tecnicoId: string) {
+  const [asignaciones, beneficiarios] = await Promise.all([
+    obtenerAsignacionesTecnico(tecnicoId),
+    obtenerBeneficiariosTecnico(tecnicoId),
+  ]);
+
+  const beneficiariosMap = new Map(
+    beneficiarios.map((beneficiario) => [beneficiario.id, beneficiario] as const)
+  );
+
+  const beneficiarioItems = asignaciones.beneficiarios.map((item) => {
+    const beneficiario = beneficiariosMap.get(item.beneficiario_id);
+
+    return {
+      id: item.id,
+      id_asignacion: item.id,
+      id_tecnico: item.tecnico_id,
+      tipo_asignacion: "beneficiario",
+      nombre: item.beneficiario_nombre,
+      descripcion: null,
+      descripcion_actividad: null,
+      prioridad: "MEDIA",
+      fecha_limite: null,
+      completado: false,
+      activo: item.activo,
+      created_by: item.asignado_por,
+      created_at: item.asignado_en,
+      updated_at: item.removido_en ?? item.asignado_en,
+      beneficiario: {
+        id: item.beneficiario_id,
+        id_beneficiario: item.beneficiario_id,
+        nombre: beneficiario?.nombre ?? item.beneficiario_nombre,
+        nombre_completo: beneficiario?.nombre ?? item.beneficiario_nombre,
+        municipio: beneficiario?.municipio ?? item.municipio,
+        localidad: beneficiario?.localidad ?? item.localidad,
+        folio_saderh: null,
+        cadena_productiva: beneficiario ? cadenaPrincipal(beneficiario) : null,
+        activo: beneficiario?.activo ?? true,
+      },
+    };
+  });
+
+  const actividadItems = asignaciones.actividades.map((item) => ({
+    id: item.id,
+    id_asignacion: item.id,
+    id_tecnico: item.tecnico_id,
+    tipo_asignacion: "actividad",
+    nombre: item.actividad_nombre,
+    descripcion: item.actividad_descripcion,
+    descripcion_actividad: item.actividad_descripcion,
+    prioridad: "MEDIA",
+    fecha_limite: null,
+    completado: false,
+    activo: item.activo,
+    created_by: item.asignado_por,
+    created_at: item.asignado_en,
+    updated_at: item.removido_en ?? item.asignado_en,
+    beneficiario: null,
+  }));
+
+  const items = [...actividadItems, ...beneficiarioItems];
+
+  return {
+    success: true,
+    asignaciones: items,
+    total: items.length,
+  };
+}
+
 export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
   try {
     return await sql<BeneficiarioConCadenas[]>`
@@ -107,6 +182,30 @@ export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
   `;
 }
 
+export async function obtenerBeneficiariosTecnicoParaApp(tecnicoId: string) {
+  const beneficiarios = await obtenerBeneficiariosTecnico(tecnicoId);
+
+  const items = beneficiarios.map((beneficiario) => ({
+    id: beneficiario.id,
+    id_beneficiario: beneficiario.id,
+    nombre: beneficiario.nombre,
+    nombre_completo: beneficiario.nombre,
+    municipio: beneficiario.municipio,
+    localidad: beneficiario.localidad,
+    curp: null,
+    folio_saderh: null,
+    cadena_productiva: cadenaPrincipal(beneficiario),
+    telefono_contacto: beneficiario.telefono_principal,
+    activo: beneficiario.activo,
+  }));
+
+  return {
+    success: true,
+    beneficiarios: items,
+    total: items.length,
+  };
+}
+
 export async function crearBeneficiario(
   tecnicoId: string,
   data: {
@@ -115,6 +214,8 @@ export async function crearBeneficiario(
     localidad: string;
     telefono: string;
     cadena_productiva?: string;
+    curp?: string;
+    folio_saderh?: string;
   }
 ) {
   const [nuevoBeneficiario] = await sql`
