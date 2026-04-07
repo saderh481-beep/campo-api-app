@@ -125,6 +125,7 @@ export async function obtenerAsignacionesTecnicoParaApp(tecnicoId: string) {
 
   return {
     success: true,
+    id_tecnico: tecnicoId,
     asignaciones: items,
     total: items.length,
   };
@@ -187,6 +188,7 @@ export async function obtenerBeneficiariosTecnicoParaApp(tecnicoId: string) {
 
   const items = beneficiarios.map((beneficiario) => ({
     id: beneficiario.id,
+    id_tecnico: tecnicoId,
     id_beneficiario: beneficiario.id,
     nombre: beneficiario.nombre,
     nombre_completo: beneficiario.nombre,
@@ -201,6 +203,7 @@ export async function obtenerBeneficiariosTecnicoParaApp(tecnicoId: string) {
 
   return {
     success: true,
+    id_tecnico: tecnicoId,
     beneficiarios: items,
     total: items.length,
   };

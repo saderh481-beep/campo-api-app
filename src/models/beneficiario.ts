@@ -13,6 +13,7 @@ export interface Beneficiario {
   created_at: string;
   updated_at: string;
   localidad_id: string | null;
+  sync_id: string | null;
 }
 
 export interface BeneficiarioConCadenas extends Beneficiario {

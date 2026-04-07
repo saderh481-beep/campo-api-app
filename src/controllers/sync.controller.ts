@@ -32,6 +32,19 @@ const schemaBitacoraTipoB = z.object({
 
 const schemaCrearBitacoraPayload = z.union([schemaBitacoraTipoA, schemaBitacoraTipoB]);
 
+const schemaCrearBeneficiarioPayload = z.object({
+  sync_id: z.string(),
+  nombre: z.string().min(1),
+  municipio: z.string().min(1),
+  localidad: z.string().min(1),
+  telefono: z.string().optional(),
+  telefono_secundario: z.string().optional(),
+  direccion: z.string().optional(),
+  cp: z.string().optional(),
+  coord_parcela: z.string().optional(),
+  cadena_productiva_id: z.string().uuid().optional(),
+});
+
 const schemaEditarBitacoraPayload = z.object({
   sync_id: z.string(),
   actividades_desc: z.string().optional(),
@@ -50,6 +63,11 @@ const schemaCerrarBitacoraPayload = z.object({
 });
 
 const schemaOperacion = z.discriminatedUnion("operacion", [
+  z.object({
+    operacion: z.literal("crear_beneficiario"),
+    timestamp: z.string().datetime(),
+    payload: schemaCrearBeneficiarioPayload,
+  }),
   z.object({
     operacion: z.literal("crear_bitacora"),
     timestamp: z.string().datetime(),

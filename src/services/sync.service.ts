@@ -1,5 +1,5 @@
 import { sql } from "@/db";
-import type { BitacoraResumen } from "@/models";
+import type { BitacoraResumen, Beneficiario } from "@/models";
 
 export async function sincronizarOperaciones(
   tecnicoId: string,
@@ -28,7 +28,76 @@ export async function sincronizarOperaciones(
 
   for (const op of ordenadas) {
     try {
-      if (op.operacion === "crear_bitacora") {
+      if (op.operacion === "crear_beneficiario") {
+        const p = op.payload;
+
+        if (!p.sync_id) throw new Error("sync_id requerido");
+        
+        const [existente] = await sql<{ id: string }[]>`
+          SELECT id FROM beneficiarios WHERE sync_id = ${String(p.sync_id)} AND tecnico_id = ${tecnicoId}
+        `;
+        if (existente) {
+          resultados.push({
+            sync_id: String(p.sync_id),
+            id: existente.id,
+            remote_id: existente.id,
+            entidad: "beneficiario",
+            operacion: op.operacion,
+            exito: true,
+            estado: "sincronizado",
+          });
+          continue;
+        }
+
+        const [nuevo] = await sql<{ id: string; updated_at: string }[]>`
+          INSERT INTO beneficiarios (
+            nombre, municipio, localidad, telefono_principal, tecnico_id, sync_id,
+            telefono_secundario, direccion, cp, coord_parcela
+          ) VALUES (
+            ${String(p.nombre)},
+            ${String(p.municipio)},
+            ${String(p.localidad)},
+            ${String(p.telefono ?? "")},
+            ${tecnicoId},
+            ${String(p.sync_id)},
+            ${(p.telefono_secundario as string | null) ?? null},
+            ${(p.direccion as string | null) ?? null},
+            ${(p.cp as string | null) ?? null},
+            ${(p.coord_parcela as string | null) ?? null}
+          )
+          RETURNING id, updated_at
+        `;
+
+        await sql`
+          INSERT INTO asignaciones_beneficiario (tecnico_id, beneficiario_id, asignado_por, activo)
+          VALUES (${tecnicoId}, ${nuevo.id}, ${tecnicoId}, true)
+          ON CONFLICT (tecnico_id, beneficiario_id) WHERE (activo = true)
+          DO UPDATE SET activo = true
+        `;
+
+        if (p.cadena_productiva_id) {
+          const [cadena] = await sql`SELECT id FROM cadenas_productivas WHERE id = ${String(p.cadena_productiva_id)} LIMIT 1`;
+          if (cadena) {
+            await sql`
+              INSERT INTO beneficiario_cadenas (beneficiario_id, cadena_id, activo)
+              VALUES (${nuevo.id}, ${cadena.id}, true)
+              ON CONFLICT (beneficiario_id, cadena_id) DO UPDATE SET activo = true
+            `;
+          }
+        }
+
+        resultados.push({
+          sync_id: String(p.sync_id),
+          id: nuevo.id,
+          remote_id: nuevo.id,
+          entidad: "beneficiario",
+          operacion: op.operacion,
+          exito: true,
+          estado: "sincronizado",
+          updated_at: nuevo.updated_at,
+        });
+
+      } else if (op.operacion === "crear_bitacora") {
         const p = op.payload;
 
         if (!p.sync_id) throw new Error("sync_id requerido");
