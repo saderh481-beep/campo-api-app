@@ -45,7 +45,9 @@ async function obtenerTecnicosPorCodigo(codigoNormalizado: string) {
     if ((error as { code?: string })?.code !== "42703") {
       throw error;
     }
+  }
 
+  try {
     return await sql<UsuarioLogin[]>`
       SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso, fecha_limite, estado_corte
       FROM usuarios
@@ -56,7 +58,39 @@ async function obtenerTecnicosPorCodigo(codigoNormalizado: string) {
         )
       ORDER BY updated_at DESC, created_at DESC
     `;
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "42703") {
+      throw error;
+    }
   }
+
+  try {
+    return await sql<UsuarioLogin[]>`
+      SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso, estado_corte
+      FROM usuarios
+      WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
+        AND (
+          codigo_acceso = ${codigoNormalizado}
+          OR hash_codigo_acceso IS NOT NULL
+        )
+      ORDER BY updated_at DESC, created_at DESC
+    `;
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "42703") {
+      throw error;
+    }
+  }
+
+  return await sql<UsuarioLogin[]>`
+    SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso
+    FROM usuarios
+    WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
+      AND (
+        codigo_acceso = ${codigoNormalizado}
+        OR hash_codigo_acceso IS NOT NULL
+      )
+    ORDER BY updated_at DESC, created_at DESC
+  `;
 }
 
 export async function loginTecnico(codigo: string, ip?: string, userAgent?: string) {

@@ -25,7 +25,9 @@ async function obtenerTecnicoActual(tecnicoId: string) {
     if ((error as { code?: string })?.code !== "42703") {
       throw error;
     }
+  }
 
+  try {
     const [tecnico] = await sql`
       SELECT fecha_limite, estado_corte
       FROM usuarios
@@ -36,7 +38,39 @@ async function obtenerTecnicoActual(tecnicoId: string) {
     return tecnico as
       | { activo?: boolean | null; fecha_limite: string | Date | null; estado_corte: string | null }
       | undefined;
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "42703") {
+      throw error;
+    }
   }
+
+  try {
+    const [tecnico] = await sql`
+      SELECT estado_corte
+      FROM usuarios
+      WHERE id = ${tecnicoId}
+      LIMIT 1
+    `;
+
+    return tecnico as
+      | { activo?: boolean | null; fecha_limite?: string | Date | null; estado_corte: string | null }
+      | undefined;
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "42703") {
+      throw error;
+    }
+  }
+
+  const [tecnico] = await sql`
+    SELECT id
+    FROM usuarios
+    WHERE id = ${tecnicoId}
+    LIMIT 1
+  `;
+
+  return tecnico as
+    | { activo?: boolean | null; fecha_limite?: string | Date | null; estado_corte?: string | null }
+    | undefined;
 }
 
 export const authMiddleware = createMiddleware<Env>(async (c, next) => {
@@ -71,7 +105,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 
   const tecnico = c.get("tecnico");
   let tecnicoActual:
-    | { activo?: boolean | null; fecha_limite: string | Date | null; estado_corte: string | null }
+    | { activo?: boolean | null; fecha_limite?: string | Date | null; estado_corte?: string | null }
     | undefined;
   try {
     tecnicoActual = await obtenerTecnicoActual(tecnico.sub);
