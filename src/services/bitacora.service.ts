@@ -57,17 +57,35 @@ export async function obtenerBitacorasTecnico(
   const { limit = 50, offset = 0, estado } = options;
   const ahora = new Date();
 
-  const bitacoras = await sql<Bitacora[]>`
-    SELECT *
-    FROM bitacoras
-    WHERE tecnico_id = ${tecnicoId}
-      AND (${estado ?? null} IS NULL OR estado = ${estado ?? null})
-      AND EXTRACT(MONTH FROM fecha_inicio) = ${ahora.getMonth() + 1}
-      AND EXTRACT(YEAR FROM fecha_inicio) = ${ahora.getFullYear()}
-    ORDER BY fecha_inicio DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `;
-  return bitacoras;
+  const mes = ahora.getMonth() + 1;
+  const anio = ahora.getFullYear();
+
+  let bitacoras: Bitacora;
+
+  if (estado) {
+    [bitacoras] = await sql<Bitacora[]>`
+      SELECT *
+      FROM bitacoras
+      WHERE tecnico_id = ${tecnicoId}
+        AND estado = ${estado}
+        AND EXTRACT(MONTH FROM fecha_inicio) = ${mes}
+        AND EXTRACT(YEAR FROM fecha_inicio) = ${anio}
+      ORDER BY fecha_inicio DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else {
+    [bitacoras] = await sql<Bitacora[]>`
+      SELECT *
+      FROM bitacoras
+      WHERE tecnico_id = ${tecnicoId}
+        AND EXTRACT(MONTH FROM fecha_inicio) = ${mes}
+        AND EXTRACT(YEAR FROM fecha_inicio) = ${anio}
+      ORDER BY fecha_inicio DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+
+  return bitacoras ?? [];
 }
 
 export async function obtenerBitacoraPorId(tecnicoId: string, bitacoraId: string) {
@@ -99,18 +117,52 @@ export async function actualizarBitacora(
     return { error: "Solo se pueden editar borradores" };
   }
 
-  const [actualizada] = await sql<Bitacora[]>`
-    UPDATE bitacoras SET
-      observaciones_coordinador = COALESCE(${data.observaciones_coordinador ?? null}, observaciones_coordinador),
-      actividades_desc          = COALESCE(${data.actividades_desc ?? null}, actividades_desc),
-      coord_inicio              = COALESCE(${data.coord_inicio ?? null}, coord_inicio),
-      coord_fin                 = COALESCE(${data.coord_fin ?? null}, coord_fin),
-      fecha_inicio              = COALESCE(${data.fecha_inicio ?? null}, fecha_inicio),
-      fecha_fin                 = COALESCE(${data.fecha_fin ?? null}, fecha_fin),
-      recomendaciones           = COALESCE(${data.recomendaciones ?? null}, recomendaciones),
-      comentarios_beneficiario  = COALESCE(${data.comentarios_beneficiario ?? null}, comentarios_beneficiario),
-      updated_at                = NOW()
-    WHERE id = ${bitacoraId}
+  const updates: string[] = [];
+  const params: any[] = [bitacoraId];
+  let paramIndex = 2;
+
+  if (data.observaciones_coordinador !== undefined) {
+    updates.push(`observaciones_coordinador = $${paramIndex++}`);
+    params.push(data.observaciones_coordinador);
+  }
+  if (data.actividades_desc !== undefined) {
+    updates.push(`actividades_desc = $${paramIndex++}`);
+    params.push(data.actividades_desc);
+  }
+  if (data.coord_inicio !== undefined) {
+    updates.push(`coord_inicio = $${paramIndex++}`);
+    params.push(data.coord_inicio);
+  }
+  if (data.coord_fin !== undefined) {
+    updates.push(`coord_fin = $${paramIndex++}`);
+    params.push(data.coord_fin);
+  }
+  if (data.fecha_inicio !== undefined) {
+    updates.push(`fecha_inicio = $${paramIndex++}`);
+    params.push(data.fecha_inicio);
+  }
+  if (data.fecha_fin !== undefined) {
+    updates.push(`fecha_fin = $${paramIndex++}`);
+    params.push(data.fecha_fin);
+  }
+  if (data.recomendaciones !== undefined) {
+    updates.push(`recomendaciones = $${paramIndex++}`);
+    params.push(data.recomendaciones);
+  }
+  if (data.comentarios_beneficiario !== undefined) {
+    updates.push(`comentarios_beneficiario = $${paramIndex++}`);
+    params.push(data.comentarios_beneficiario);
+  }
+
+  if (updates.length === 0) {
+    return { error: "No hay campos para actualizar" };
+  }
+
+  updates.push(`updated_at = NOW()`);
+
+  const query = `
+    UPDATE bitacoras SET ${updates.join(", ")}
+    WHERE id = $1 AND tecnico_id = ${tecnicoId}
     RETURNING
       id,
       tipo,
@@ -124,6 +176,8 @@ export async function actualizarBitacora(
       recomendaciones,
       comentarios_beneficiario
   `;
+
+  const [actualizada] = await sql.unsafe(query, params);
   return actualizada;
 }
 
