@@ -97,6 +97,11 @@ export async function sincronizarOperaciones(
           updated_at: nuevo.updated_at,
         });
 
+        await sql`
+          INSERT INTO notificaciones (destino_id, destino_tipo, tipo, titulo, cuerpo)
+          VALUES (${tecnicoId}, 'tecnico', 'beneficiario_creado', 'Nuevo beneficiario registrado', ${String(p.nombre) + ' ha sido registrado exitosamente'})
+        `;
+
       } else if (op.operacion === "crear_bitacora") {
         const p = op.payload;
 
