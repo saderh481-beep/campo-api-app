@@ -22,7 +22,7 @@ app.post(
   zValidator("json", schemaLogin),
   async (c) => {
     const { codigo } = c.req.valid("json");
-    const ip = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip");
+    const ip = (c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip"))?.split(",")[0]?.trim();
     const userAgent = c.req.header("user-agent");
 
     const resultado = await loginTecnico(codigo, ip, userAgent);
