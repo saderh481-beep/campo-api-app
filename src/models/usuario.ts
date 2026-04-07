@@ -18,7 +18,7 @@ export interface UsuarioLogin {
   nombre: string;
   correo: string;
   rol: string | null;
-  activo: boolean;
+  activo?: boolean | null;
   codigo_acceso: string | null;
   hash_codigo_acceso: string | null;
   fecha_limite: string | null;
