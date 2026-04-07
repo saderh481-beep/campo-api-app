@@ -2,6 +2,7 @@ import { Redis } from "ioredis";
 import { env, requireEnv } from "@/config/env";
 
 let redisClient: Redis | null = null;
+let redisDisabledReason: string | null = null;
 
 function getRedisUrl() {
   if (env.NODE_ENV === "production") {
@@ -11,27 +12,72 @@ function getRedisUrl() {
   return env.REDIS_PUBLIC_URL?.trim() || requireEnv("REDIS_URL");
 }
 
-function getRedisClient() {
-  if (!redisClient) {
-    redisClient = new Redis(getRedisUrl(), {
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: true,
-      lazyConnect: true,
-      retryStrategy: (times) => Math.min(times * 200, 2_000),
-    });
+function normalizeRedisUrl(url: string) {
+  const trimmed = url.trim();
+  const duplicateSchemeIndex = trimmed.indexOf("redis://", "redis://".length);
+  const candidate = duplicateSchemeIndex >= 0 ? trimmed.slice(0, duplicateSchemeIndex) : trimmed;
+  const parsed = new URL(candidate);
 
-    redisClient.on("error", (err) => {
-      console.error("[Redis] error:", err.message);
-    });
+  if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") {
+    throw new Error("protocolo Redis inválido");
+  }
+
+  if (!parsed.hostname) {
+    throw new Error("host Redis inválido");
+  }
+
+  return candidate;
+}
+
+function getRedisClient() {
+  if (redisDisabledReason) return null;
+  if (!redisClient) {
+    try {
+      const redisUrl = normalizeRedisUrl(getRedisUrl());
+      redisClient = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: true,
+        lazyConnect: true,
+        retryStrategy: (times) => Math.min(times * 200, 2_000),
+      });
+
+      redisClient.on("error", (err) => {
+        console.error("[Redis] error:", err.message);
+      });
+    } catch (error) {
+      redisDisabledReason = error instanceof Error ? error.message : "configuración inválida";
+      console.error(`[Redis] deshabilitado: ${redisDisabledReason}`);
+      return null;
+    }
   }
 
   return redisClient;
 }
 
 export const redis = {
-  del: (key: string) => getRedisClient().del(key),
-  expire: (key: string, seconds: number) => getRedisClient().expire(key, seconds),
-  get: (key: string) => getRedisClient().get(key),
-  incr: (key: string) => getRedisClient().incr(key),
-  setex: (key: string, seconds: number, value: string) => getRedisClient().setex(key, seconds, value),
+  async del(key: string) {
+    const client = getRedisClient();
+    if (!client) return 0;
+    return client.del(key);
+  },
+  async expire(key: string, seconds: number) {
+    const client = getRedisClient();
+    if (!client) return 0;
+    return client.expire(key, seconds);
+  },
+  async get(key: string) {
+    const client = getRedisClient();
+    if (!client) return null;
+    return client.get(key);
+  },
+  async incr(key: string) {
+    const client = getRedisClient();
+    if (!client) return 0;
+    return client.incr(key);
+  },
+  async setex(key: string, seconds: number, value: string) {
+    const client = getRedisClient();
+    if (!client) return "OK";
+    return client.setex(key, seconds, value);
+  },
 };
