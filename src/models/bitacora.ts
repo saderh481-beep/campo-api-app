@@ -28,6 +28,8 @@ export interface Bitacora {
   created_at: string;
   updated_at: string;
   pdf_edicion: Record<string, unknown>;
+  beneficiario_nombre?: string;
+  actividad_nombre?: string;
 }
 
 export interface BitacoraResumen {

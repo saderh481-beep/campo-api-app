@@ -60,39 +60,65 @@ export async function obtenerBitacorasTecnico(
   const mes = ahora.getMonth() + 1;
   const anio = ahora.getFullYear();
 
-  let bitacoras: Bitacora;
+  let bitacoras = await sql<Bitacora[]>`
+    SELECT *
+    FROM bitacoras
+    WHERE tecnico_id = ${tecnicoId}
+      AND estado = ${estado ?? "borrador"}
+      AND EXTRACT(MONTH FROM fecha_inicio) = ${mes}
+      AND EXTRACT(YEAR FROM fecha_inicio) = ${anio}
+    ORDER BY fecha_inicio DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
 
-  if (estado) {
-    [bitacoras] = await sql<Bitacora[]>`
-      SELECT *
-      FROM bitacoras
-      WHERE tecnico_id = ${tecnicoId}
-        AND estado = ${estado}
-        AND EXTRACT(MONTH FROM fecha_inicio) = ${mes}
-        AND EXTRACT(YEAR FROM fecha_inicio) = ${anio}
-      ORDER BY fecha_inicio DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  } else {
-    [bitacoras] = await sql<Bitacora[]>`
-      SELECT *
-      FROM bitacoras
-      WHERE tecnico_id = ${tecnicoId}
-        AND EXTRACT(MONTH FROM fecha_inicio) = ${mes}
-        AND EXTRACT(YEAR FROM fecha_inicio) = ${anio}
-      ORDER BY fecha_inicio DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-  }
+  if (!bitacoras || bitacoras.length === 0) return [];
 
-  return bitacoras ?? [];
+  const enriched = await Promise.all(
+    bitacoras.map(async (b) => {
+      if (b.beneficiario_id) {
+        const [beneficiario] = await sql<{ nombre: string }[]>`
+          SELECT nombre FROM beneficiarios WHERE id = ${b.beneficiario_id}
+        `;
+        if (beneficiario) return { ...b, beneficiario_nombre: beneficiario.nombre };
+      }
+      if (b.actividad_id) {
+        const [actividad] = await sql<{ nombre: string }[]>`
+          SELECT nombre FROM actividades WHERE id = ${b.actividad_id}
+        `;
+        if (actividad) return { ...b, actividad_nombre: actividad.nombre };
+      }
+      return b;
+    })
+  );
+
+  return enriched;
 }
 
 export async function obtenerBitacoraPorId(tecnicoId: string, bitacoraId: string) {
   const [bitacora] = await sql<Bitacora[]>`
     SELECT * FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
   `;
-  return bitacora ?? null;
+  if (!bitacora) return null;
+
+  if (bitacora.beneficiario_id) {
+    const [beneficiario] = await sql<{ id: string; nombre: string }[]>`
+      SELECT id, nombre FROM beneficiarios WHERE id = ${bitacora.beneficiario_id}
+    `;
+    if (beneficiario) {
+      return { ...bitacora, beneficiario_nombre: beneficiario.nombre };
+    }
+  }
+
+  if (bitacora.actividad_id) {
+    const [actividad] = await sql<{ id: string; nombre: string }[]>`
+      SELECT id, nombre FROM actividades WHERE id = ${bitacora.actividad_id}
+    `;
+    if (actividad) {
+      return { ...bitacora, actividad_nombre: actividad.nombre };
+    }
+  }
+
+  return bitacora;
 }
 
 export async function actualizarBitacora(
