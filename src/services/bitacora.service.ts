@@ -56,6 +56,8 @@ export async function obtenerBitacorasTecnico(
 ) {
   const { limit = 50, offset = 0, estado } = options;
 
+  console.log("[obtenerBitacorasTecnico] tecnicoId:", tecnicoId, "estado:", estado, "limit:", limit, "offset:", offset);
+
   let bitacoras;
   if (estado) {
     bitacoras = await sql<Bitacora[]>`
@@ -75,6 +77,8 @@ export async function obtenerBitacorasTecnico(
       LIMIT ${limit} OFFSET ${offset}
     `;
   }
+
+  console.log("[obtenerBitacorasTecnico] Query ejecutada, bitacoras.length:", bitacoras?.length ?? 0);
 
   if (!bitacoras || bitacoras.length === 0) return [];
 
