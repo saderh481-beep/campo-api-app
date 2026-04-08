@@ -55,21 +55,26 @@ export async function obtenerBitacorasTecnico(
   options: { limit?: number; offset?: number; estado?: string } = {}
 ) {
   const { limit = 50, offset = 0, estado } = options;
-  const ahora = new Date();
 
-  const mes = ahora.getMonth() + 1;
-  const anio = ahora.getFullYear();
-
-  let bitacoras = await sql<Bitacora[]>`
-    SELECT *
-    FROM bitacoras
-    WHERE tecnico_id = ${tecnicoId}
-      AND estado = ${estado ?? "borrador"}
-      AND EXTRACT(MONTH FROM fecha_inicio) = ${mes}
-      AND EXTRACT(YEAR FROM fecha_inicio) = ${anio}
-    ORDER BY fecha_inicio DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `;
+  let bitacoras;
+  if (estado) {
+    bitacoras = await sql<Bitacora[]>`
+      SELECT *
+      FROM bitacoras
+      WHERE tecnico_id = ${tecnicoId}
+        AND estado = ${estado}
+      ORDER BY fecha_inicio DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else {
+    bitacoras = await sql<Bitacora[]>`
+      SELECT *
+      FROM bitacoras
+      WHERE tecnico_id = ${tecnicoId}
+      ORDER BY fecha_inicio DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
 
   if (!bitacoras || bitacoras.length === 0) return [];
 
