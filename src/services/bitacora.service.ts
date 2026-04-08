@@ -247,47 +247,66 @@ export async function cerrarBitacora(
   bitacoraId: string,
   data: { fecha_fin: string; coord_fin?: string }
 ) {
-  const [bitacora] = await sql<Bitacora[]>`
-    SELECT * FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
-  `;
-  if (!bitacora) return { error: "Bitácora no encontrada" };
-  if (bitacora.estado !== "borrador") {
-    return { error: "La bitácora ya está cerrada" };
-  }
+  try {
+    const [bitacora] = await sql<Bitacora[]>`
+      SELECT * FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
+    `;
+    if (!bitacora) return { error: "Bitácora no encontrada" };
+    if (bitacora.estado !== "borrador") {
+      return { error: "La bitácora ya está cerrada" };
+    }
 
-  const [cerrada] = await sql<Bitacora[]>`
-    UPDATE bitacoras SET
-      estado = 'cerrada',
-      fecha_fin = ${data.fecha_fin},
-      coord_fin = ${data.coord_fin ?? null},
-      updated_at = NOW()
-    WHERE id = ${bitacoraId}
-    RETURNING *
-  `;
-
-  // Generar PDF
-  const pdfBytes = await generarPdfBitacora(cerrada);
-  const buffer = Buffer.from(pdfBytes);
-  const sha256 = createHash("sha256").update(buffer).digest("hex");
-  const mes = new Date(cerrada.fecha_inicio).getMonth() + 1;
-  const { secure_url } = await subirPdfBitacora(buffer, tecnicoId, mes, bitacoraId);
-  const nuevaVersion = Number(cerrada.pdf_version ?? 0) + 1;
-
-  await sql`
-    UPDATE bitacoras
-    SET pdf_version = ${nuevaVersion},
-        pdf_url_actual = ${secure_url},
-        pdf_original_url = COALESCE(pdf_original_url, ${secure_url}),
+    const [cerrada] = await sql<Bitacora[]>`
+      UPDATE bitacoras SET
+        estado = 'cerrada',
+        fecha_fin = ${data.fecha_fin},
+        coord_fin = ${data.coord_fin ?? null},
         updated_at = NOW()
-    WHERE id = ${bitacoraId}
-  `;
+      WHERE id = ${bitacoraId}
+      RETURNING *
+    `;
 
-  await sql`
-    INSERT INTO pdf_versiones (bitacora_id, version, r2_key, sha256, inmutable, generado_por)
-    VALUES (${bitacoraId}, ${nuevaVersion}, ${secure_url}, ${sha256}, false, ${tecnicoId})
-  `;
+    // Generar PDF
+    try {
+      const pdfBytes = await generarPdfBitacora(cerrada);
+      const buffer = Buffer.from(pdfBytes);
+      const sha256 = createHash("sha256").update(buffer).digest("hex");
+      const mes = new Date(cerrada.fecha_inicio).getMonth() + 1;
+      const { secure_url } = await subirPdfBitacora(buffer, tecnicoId, mes, bitacoraId);
+      const nuevaVersion = Number(cerrada.pdf_version ?? 0) + 1;
 
-  return { id: bitacoraId, estado: "cerrada", pdf_url: secure_url };
+      await sql`
+        UPDATE bitacoras
+        SET pdf_version = ${nuevaVersion},
+            pdf_url_actual = ${secure_url},
+            pdf_original_url = COALESCE(pdf_original_url, ${secure_url}),
+            updated_at = NOW()
+        WHERE id = ${bitacoraId}
+      `;
+
+      await sql`
+        INSERT INTO pdf_versiones (bitacora_id, version, r2_key, sha256, inmutable, generado_por)
+        VALUES (${bitacoraId}, ${nuevaVersion}, ${secure_url}, ${sha256}, false, ${tecnicoId})
+      `;
+    } catch (pdfErr) {
+      console.error("Error al generar/subir PDF:", pdfErr);
+    }
+
+    // Notificación al técnico
+    try {
+      await sql`
+        INSERT INTO notificaciones (destino_id, destino_tipo, tipo, titulo, cuerpo)
+        VALUES (${tecnicoId}, 'tecnico', 'bitacora_cerrada', 'Bitácora cerrada', ${'La bitácora ' + bitacoraId.slice(0, 8) + ' ha sido cerrada exitosamente'})
+      `;
+    } catch (notifErr) {
+      console.error("Error al crear notificación:", notifErr);
+    }
+
+    return { id: bitacoraId, estado: "cerrada" };
+  } catch (err) {
+    console.error("Error en cerrarBitacora:", err);
+    return { error: "Error al cerrar bitácora" };
+  }
 }
 
 export async function eliminarBitacora(tecnicoId: string, bitacoraId: string) {
