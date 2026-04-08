@@ -63,6 +63,8 @@ app.post("/", zValidator("json", schemaBitacora), async (c) => {
   return c.json({ id: resultado.id }, 201);
 });
 
+import { sql } from "@/db";
+
 app.get("/", async (c) => {
   const tecnico = c.get("tecnico");
   const limit = parseInt(c.req.query("limit") ?? "50");
@@ -71,6 +73,24 @@ app.get("/", async (c) => {
 
   const bitacoras = await obtenerBitacorasTecnico(tecnico.sub, { limit, offset, estado });
   return c.json(bitacoras);
+});
+
+app.get("/contador", async (c) => {
+  const tecnico = c.get("tecnico");
+  const ahora = new Date();
+  const mes = ahora.getMonth() + 1;
+  const anio = ahora.getFullYear();
+
+  const [result] = await sql<{ total: number }[]>`
+    SELECT COUNT(*)::int as total
+    FROM bitacoras
+    WHERE tecnico_id = ${tecnico.sub}
+      AND estado = 'borrador'
+      AND EXTRACT(MONTH FROM fecha_inicio) = ${mes}
+      AND EXTRACT(YEAR FROM fecha_inicio) = ${anio}
+  `;
+
+  return c.json({ pendientes: result?.total ?? 0 });
 });
 
 app.get("/:id", async (c) => {
