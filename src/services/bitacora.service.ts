@@ -195,9 +195,11 @@ export async function actualizarBitacora(
 
   updates.push(`updated_at = NOW()`);
 
+  params.push(tecnicoId);
+
   const query = `
     UPDATE bitacoras SET ${updates.join(", ")}
-    WHERE id = $1 AND tecnico_id = ${tecnicoId}
+    WHERE id = $1 AND tecnico_id = $${paramIndex}
     RETURNING
       id,
       tipo,
