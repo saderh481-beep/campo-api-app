@@ -345,6 +345,76 @@ app.post("/:id/fotos-campo/urls", async (c) => {
   return c.json(resultado);
 });
 
+app.get("/:id/foto-rostro", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+
+  const [bitacora] = await sql<{ foto_rostro_url: string | null }[]>`
+    SELECT foto_rostro_url FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}
+  `;
+  if (!bitacora) {
+    return c.json({ error: "Bitácora no encontrada" }, 404);
+  }
+
+  return c.json({ url: bitacora.foto_rostro_url });
+});
+
+app.get("/:id/firma", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+
+  const [bitacora] = await sql<{ firma_url: string | null }[]>`
+    SELECT firma_url FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}
+  `;
+  if (!bitacora) {
+    return c.json({ error: "Bitácora no encontrada" }, 404);
+  }
+
+  return c.json({ url: bitacora.firma_url });
+});
+
+app.get("/:id/fotos-campo", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+
+  const [bitacora] = await sql<{ fotos_campo: string[] }[]>`
+    SELECT fotos_campo FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}
+  `;
+  if (!bitacora) {
+    return c.json({ error: "Bitácora no encontrada" }, 404);
+  }
+
+  return c.json({ urls: bitacora.fotos_campo || [] });
+});
+
+app.delete("/:id/fotos-campo/:idx", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id, idx } = c.req.param();
+  const index = parseInt(idx);
+
+  if (isNaN(index)) {
+    return c.json({ error: "Índice inválido" }, 400);
+  }
+
+  const [bitacora] = await sql<{ fotos_campo: string[] }[]>`
+    SELECT fotos_campo FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}
+  `;
+  if (!bitacora) {
+    return c.json({ error: "Bitácora no encontrada" }, 404);
+  }
+
+  const urls: string[] = bitacora.fotos_campo || [];
+  if (index < 0 || index >= urls.length) {
+    return c.json({ error: "Índice fuera de rango" }, 400);
+  }
+
+  urls.splice(index, 1);
+
+  await sql`UPDATE bitacoras SET fotos_campo = ${JSON.stringify(urls)}, updated_at = NOW() WHERE id = ${id}`;
+
+  return c.json({ urls });
+});
+
 const schemaCerrarBitacora = z.object({
   fecha_fin: z.string().datetime(),
   coord_fin: z.string().optional(),
