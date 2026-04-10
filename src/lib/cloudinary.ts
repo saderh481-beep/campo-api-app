@@ -1,4 +1,5 @@
 import { v2 as cloudinary, type UploadApiOptions } from "cloudinary";
+import { createHash, createHmac } from "node:crypto";
 import { env, requireEnv } from "@/config/env";
 
 let configured = false;
@@ -21,6 +22,54 @@ function ensureCloudinaryConfigured() {
   });
 
   configured = true;
+}
+
+export interface UploadSignature {
+  signature: string;
+  timestamp: number;
+  cloudName: string;
+  apiKey: string;
+  folder: string;
+  publicId?: string;
+  resourceType: "image" | "raw";
+}
+
+function generateSignature(timestamp: number, folder: string, publicId?: string): string {
+  const apiSecret = requireEnv("CLOUDINARY_API_SECRET");
+  const params: string[] = [`timestamp=${timestamp}`, `folder=${folder}`];
+  if (publicId) {
+    params.push(`public_id=${publicId}`);
+  }
+  params.sort();
+  const payload = params.join("&");
+  const hmac = createHmac("sha256", apiSecret);
+  hmac.update(payload);
+  return hmac.digest("hex");
+}
+
+export function generateUploadSignature(options: {
+  folder: string;
+  publicId?: string;
+  resourceType?: "image" | "raw";
+}): UploadSignature | null {
+  if (!cloudinaryEnvConfigured()) {
+    return null;
+  }
+
+  ensureCloudinaryConfigured();
+
+  const timestamp = Math.round(Date.now() / 1000);
+  const signature = generateSignature(timestamp, options.folder, options.publicId);
+
+  return {
+    signature,
+    timestamp,
+    cloudName: requireEnv("CLOUDINARY_CLOUD_NAME"),
+    apiKey: requireEnv("CLOUDINARY_API_KEY"),
+    folder: options.folder,
+    publicId: options.publicId,
+    resourceType: options.resourceType ?? "image",
+  };
 }
 
 function buildDataUrl(buffer: Buffer, mimeType: string) {

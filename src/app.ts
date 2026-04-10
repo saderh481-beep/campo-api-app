@@ -36,6 +36,24 @@ app.get("/health", (c) =>
   c.json({ status: "ok", service: "api-app", ts: new Date().toISOString() })
 );
 
+app.get("/cloudinary-config", (c) => {
+  const hasCloudinary = Boolean(
+    env.CLOUDINARY_CLOUD_NAME?.trim() &&
+      env.CLOUDINARY_API_KEY?.trim() &&
+      env.CLOUDINARY_API_SECRET?.trim()
+  );
+
+  if (!hasCloudinary) {
+    return c.json({ error: "Cloudinary no configurado" }, 500);
+  }
+
+  return c.json({
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    uploadPreset: env.CLOUDINARY_PRESET_IMAGENES,
+  });
+});
+
 // Rutas de autenticación
 app.route("/auth", authController);
 

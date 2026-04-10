@@ -11,9 +11,13 @@ import {
   subirFotoRostroBitacora,
   subirFirmaBitacora,
   subirFotosCampoBitacora,
+  guardarFotoRostroUrl,
+  guardarFirmaUrl,
+  guardarFotosCampoUrls,
   cerrarBitacora,
   eliminarBitacora,
 } from "@/services/bitacora.service";
+import { generateUploadSignature } from "@/lib/cloudinary";
 
 const app = new Hono<{
   Variables: {
@@ -185,6 +189,153 @@ app.post("/:id/fotos-campo", async (c) => {
     buffers.push(Buffer.from(arrayBuffer));
   }
   const resultado = await subirFotosCampoBitacora(tecnico.sub, id, buffers);
+
+  if ("error" in resultado) {
+    const status = resultado.error === "Bitácora no encontrada" ? 404 : 400;
+    return c.json({ error: resultado.error }, status);
+  }
+
+  return c.json(resultado);
+});
+
+app.post("/:id/foto-rostro/signature", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+
+  const [bitacora] = await sql`SELECT id FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}`;
+  if (!bitacora) {
+    return c.json({ error: "Bitácora no encontrada" }, 404);
+  }
+
+  const signature = generateUploadSignature({
+    folder: `campo/rostros/${id}`,
+    publicId: `rostro-${id}`,
+    resourceType: "image",
+  });
+
+  if (!signature) {
+    return c.json({ error: "Cloudinary no configurado" }, 500);
+  }
+
+  return c.json(signature);
+});
+
+app.post("/:id/foto-rostro/url", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+  const body = await c.req.json<{ url: string }>();
+
+  if (!body.url || typeof body.url !== "string") {
+    return c.json({ error: "URL requerida" }, 400);
+  }
+
+  const resultado = await guardarFotoRostroUrl(tecnico.sub, id, body.url);
+
+  if ("error" in resultado) {
+    const status = resultado.error === "Bitácora no encontrada" ? 404 : 400;
+    return c.json({ error: resultado.error }, status);
+  }
+
+  return c.json(resultado);
+});
+
+app.post("/:id/firma/signature", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+
+  const [bitacora] = await sql`SELECT id FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}`;
+  if (!bitacora) {
+    return c.json({ error: "Bitácora no encontrada" }, 404);
+  }
+
+  const signature = generateUploadSignature({
+    folder: `campo/firmas/${id}`,
+    publicId: `firma-${id}`,
+    resourceType: "image",
+  });
+
+  if (!signature) {
+    return c.json({ error: "Cloudinary no configurado" }, 500);
+  }
+
+  return c.json(signature);
+});
+
+app.post("/:id/firma/url", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+  const body = await c.req.json<{ url: string }>();
+
+  if (!body.url || typeof body.url !== "string") {
+    return c.json({ error: "URL requerida" }, 400);
+  }
+
+  const resultado = await guardarFirmaUrl(tecnico.sub, id, body.url);
+
+  if ("error" in resultado) {
+    const status = resultado.error === "Bitácora no encontrada" ? 404 : 400;
+    return c.json({ error: resultado.error }, status);
+  }
+
+  return c.json(resultado);
+});
+
+app.post("/:id/fotos-campo/signature", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+  const index = parseInt(c.req.query("index") ?? "0");
+
+  const [bitacora] = await sql`SELECT id FROM bitacoras WHERE id = ${id} AND tecnico_id = ${tecnico.sub}`;
+  if (!bitacora) {
+    return c.json({ error: "Bitácora no encontrada" }, 404);
+  }
+
+  const timestamp = Math.round(Date.now() / 1000);
+  const folder = `campo/fotos/${tecnico.sub}/${new Date().getMonth() + 1}`;
+  const publicId = `foto-${Date.now()}-${index}`;
+
+  const signature = generateUploadSignature({
+    folder,
+    publicId,
+    resourceType: "image",
+  });
+
+  if (!signature) {
+    return c.json({ error: "Cloudinary no configurado" }, 500);
+  }
+
+  return c.json(signature);
+});
+
+app.post("/:id/fotos-campo/url", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+  const body = await c.req.json<{ url: string }>();
+
+  if (!body.url || typeof body.url !== "string") {
+    return c.json({ error: "URL requerida" }, 400);
+  }
+
+  const resultado = await guardarFotosCampoUrls(tecnico.sub, id, [body.url]);
+
+  if ("error" in resultado) {
+    const status = resultado.error === "Bitácora no encontrada" ? 404 : 400;
+    return c.json({ error: resultado.error }, status);
+  }
+
+  return c.json(resultado);
+});
+
+app.post("/:id/fotos-campo/urls", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+  const body = await c.req.json<{ urls: string[] }>();
+
+  if (!body.urls || !Array.isArray(body.urls) || body.urls.length === 0) {
+    return c.json({ error: "URLs requeridas" }, 400);
+  }
+
+  const resultado = await guardarFotosCampoUrls(tecnico.sub, id, body.urls);
 
   if ("error" in resultado) {
     const status = resultado.error === "Bitácora no encontrada" ? 404 : 400;

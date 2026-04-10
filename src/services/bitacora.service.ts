@@ -277,6 +277,59 @@ export async function subirFotosCampoBitacora(
   return { fotos_campo: todasLasUrls };
 }
 
+export async function guardarFotoRostroUrl(
+  tecnicoId: string,
+  bitacoraId: string,
+  url: string
+) {
+  const [bitacora] = await sql`
+    SELECT id FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
+  `;
+  if (!bitacora) return { error: "Bitácora no encontrada" };
+
+  await sql`UPDATE bitacoras SET foto_rostro_url = ${url}, updated_at = NOW() WHERE id = ${bitacoraId}`;
+  return { foto_rostro_url: url };
+}
+
+export async function guardarFirmaUrl(
+  tecnicoId: string,
+  bitacoraId: string,
+  url: string
+) {
+  const [bitacora] = await sql`
+    SELECT id FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
+  `;
+  if (!bitacora) return { error: "Bitácora no encontrada" };
+
+  await sql`UPDATE bitacoras SET firma_url = ${url}, updated_at = NOW() WHERE id = ${bitacoraId}`;
+  return { firma_url: url };
+}
+
+export async function guardarFotosCampoUrls(
+  tecnicoId: string,
+  bitacoraId: string,
+  urls: string[]
+) {
+  const [bitacora] = await sql`
+    SELECT id, fotos_campo FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
+  `;
+  if (!bitacora) return { error: "Bitácora no encontrada" };
+
+  const existentes: string[] = Array.isArray(bitacora.fotos_campo) ? bitacora.fotos_campo : [];
+  const disponibles = 10 - existentes.length;
+  if (disponibles <= 0) {
+    return { error: "Máximo 10 fotos por bitácora" };
+  }
+
+  const nuevasUrls = urls.slice(0, disponibles);
+  const todasLasUrls = [...existentes, ...nuevasUrls];
+
+  await sql`
+    UPDATE bitacoras SET fotos_campo = ${JSON.stringify(todasLasUrls)}, updated_at = NOW() WHERE id = ${bitacoraId}
+  `;
+  return { fotos_campo: todasLasUrls };
+}
+
 export async function cerrarBitacora(
   tecnicoId: string,
   bitacoraId: string,
