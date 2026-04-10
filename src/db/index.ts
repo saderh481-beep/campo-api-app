@@ -1,11 +1,9 @@
 import postgres from "postgres";
 import { requireEnv } from "@/config/env";
 
-type SqlClient = ReturnType<typeof postgres>;
+let sqlClient: ReturnType<typeof postgres> | null = null;
 
-let sqlClient: SqlClient | null = null;
-
-function getSqlClient() {
+export function getSqlClient() {
   if (!sqlClient) {
     const databaseUrl = requireEnv("DATABASE_URL");
     sqlClient = postgres(databaseUrl, {
@@ -19,9 +17,6 @@ function getSqlClient() {
   return sqlClient;
 }
 
-const sqlTag = (strings: TemplateStringsArray, ...values: any[]) => {
-  const client = getSqlClient() as any;
-  return client(strings, ...values);
+export const sql = {
+  unsafe: (query: string, params?: any[]) => getSqlClient().unsafe(query, params),
 };
-
-export const sql = sqlTag as unknown as SqlClient;
