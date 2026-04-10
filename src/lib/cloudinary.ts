@@ -5,11 +5,13 @@ import { env, requireEnv } from "@/config/env";
 let configured = false;
 
 function cloudinaryEnvConfigured() {
-  return Boolean(
+  const configured = Boolean(
     env.CLOUDINARY_CLOUD_NAME?.trim() &&
       env.CLOUDINARY_API_KEY?.trim() &&
       env.CLOUDINARY_API_SECRET?.trim()
   );
+  console.log("[Cloudinary] envConfigured:", configured, "cloudName:", env.CLOUDINARY_CLOUD_NAME);
+  return configured;
 }
 
 function ensureCloudinaryConfigured() {
@@ -82,6 +84,7 @@ function upload(
   fallbackMimeType: string
 ): Promise<{ secure_url: string; public_id: string }> {
   if (!cloudinaryEnvConfigured()) {
+    console.log("[Cloudinary] No configurado, retornando data URL");
     return Promise.resolve({
       secure_url: buildDataUrl(buffer, fallbackMimeType),
       public_id: String(options.public_id ?? `local-${Date.now()}`),
@@ -90,10 +93,16 @@ function upload(
 
   ensureCloudinaryConfigured();
 
+  console.log("[Cloudinary] Subiendo con preset:", options.upload_preset, "folder:", options.folder);
+
   return new Promise((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(options, (err, result) => {
-        if (err || !result) return reject(err ?? new Error("Upload failed"));
+        if (err || !result) {
+          console.error("[Cloudinary] Error uploading:", err);
+          return reject(err ?? new Error("Upload failed"));
+        }
+        console.log("[Cloudinary] Upload exitoso:", result.secure_url);
         resolve({ secure_url: result.secure_url, public_id: result.public_id });
       })
       .end(buffer);
