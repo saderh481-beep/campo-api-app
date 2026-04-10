@@ -17,6 +17,10 @@ export function getSqlClient() {
   return sqlClient;
 }
 
-export const sql = {
-  unsafe: (query: string, params?: any[]) => getSqlClient().unsafe(query, params),
-};
+function sqlTag(strings: TemplateStringsArray, ...values: any[]) {
+  return getSqlClient()(strings, ...values);
+}
+
+sqlTag.unsafe = (query: string, params?: any[]) => getSqlClient().unsafe(query, params);
+
+export const sql = sqlTag;
