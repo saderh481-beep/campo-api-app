@@ -36,6 +36,10 @@ app.get("/health", (c) =>
   c.json({ status: "ok", service: "api-app", ts: new Date().toISOString() })
 );
 
+app.get("/version", (c) =>
+  c.json({ version: "1.0.0", deployedAt: new Date().toISOString() })
+);
+
 app.get("/cloudinary-config", (c) => {
   const hasCloudinary = Boolean(
     env.CLOUDINARY_CLOUD_NAME?.trim() &&
