@@ -80,4 +80,20 @@ export const redis = {
     if (!client) return "OK";
     return client.setex(key, seconds, value);
   },
+  async publish(channel: string, message: string) {
+    const client = getRedisClient();
+    if (!client) return 0;
+    return client.publish(channel, message);
+  },
+  async subscribe(channel: string, callback: (message: string) => void) {
+    const client = getRedisClient();
+    if (!client) return;
+    const subscriber = client.duplicate();
+    await subscriber.subscribe(channel);
+    subscriber.on("message", (ch, msg) => {
+      if (ch === channel) {
+        callback(msg);
+      }
+    });
+  },
 };

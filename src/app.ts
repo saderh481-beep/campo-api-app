@@ -40,6 +40,78 @@ app.get("/version", (c) =>
   c.json({ version: "1.0.0", deployedAt: new Date().toISOString() })
 );
 
+app.get("/events/:tecnicoId", async (c) => {
+  const tecnicoId = c.req.param("tecnicoId");
+
+  c.header("Content-Type", "text/event-stream");
+  c.header("Cache-Control", "no-cache");
+  c.header("Connection", "keep-alive");
+  c.header("X-Accel-Buffering", "no");
+
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      const send = (data: object) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      };
+
+      send({ type: "connected", tecnicoId, ts: new Date().toISOString() });
+
+      const channels = ["beneficiarios:updated", "bitacora:updated"];
+
+      const handleMessage = (channel: string, msg: string) => {
+        try {
+          const parsed = JSON.parse(msg);
+          if (parsed.tecnicoId === tecnicoId || tecnicoId === "*") {
+            send({ channel, ...parsed });
+          }
+        } catch {}
+      };
+
+      const subscriptions: Promise<void>[] = [];
+
+      const { redis } = require("./lib/redis");
+      for (const channel of channels) {
+        subscriptions.push(
+          redis.subscribe(channel, (message: string) => handleMessage(channel, message)).catch(
+            (err: Error) => console.error(`[SSE] Subscribe error for ${channel}:`, err.message)
+          )
+        );
+      }
+
+      let closed = false;
+      const close = () => {
+        if (!closed) {
+          closed = true;
+          try {
+            controller.close();
+          } catch {}
+        }
+      };
+
+      c.req.raw.signal.addEventListener("abort", close);
+
+      const keepAlive = setInterval(() => {
+        if (closed) {
+          clearInterval(keepAlive);
+          return;
+        }
+        try {
+          controller.enqueue(encoder.encode(`: keepalive\n\n`));
+        } catch {
+          clearInterval(keepAlive);
+        }
+      }, 30000);
+
+      return () => {
+        clearInterval(keepAlive);
+      };
+    },
+  });
+
+  return c.body(stream);
+});
+
 app.get("/cloudinary-config", (c) => {
   const hasCloudinary = Boolean(
     env.CLOUDINARY_CLOUD_NAME?.trim() &&

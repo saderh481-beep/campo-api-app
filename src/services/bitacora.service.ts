@@ -8,6 +8,7 @@ import {
 } from "@/lib/cloudinary";
 import { generarPdfBitacora } from "@/lib/pdf";
 import type { Bitacora, BitacoraResumen } from "@/models";
+import { publishUpdate, CHANNELS } from "./pubsub.service";
 
 export async function crearBitacora(
   tecnicoId: string,
@@ -47,6 +48,15 @@ export async function crearBitacora(
     )
     RETURNING id, tipo, estado, fecha_inicio, sync_id
   `;
+
+  publishUpdate(CHANNELS.BITACORA_UPDATED, tecnicoId, {
+    action: "created",
+    bitacoraId: nueva.id,
+    tipo: nueva.tipo,
+    beneficiario_id: data.beneficiario_id,
+    actividad_id: data.actividad_id,
+  });
+
   return nueva;
 }
 
@@ -392,6 +402,11 @@ export async function cerrarBitacora(
       console.error("Error al crear notificación:", notifErr);
     }
 
+    publishUpdate(CHANNELS.BITACORA_UPDATED, tecnicoId, {
+      action: "closed",
+      bitacoraId,
+    });
+
     return { id: bitacoraId, estado: "cerrada" };
   } catch (err) {
     console.error("Error en cerrarBitacora:", err);
@@ -415,5 +430,11 @@ export async function eliminarBitacora(tecnicoId: string, bitacoraId: string) {
   }
 
   await sql`DELETE FROM bitacoras WHERE id = ${bitacoraId}`;
+
+  publishUpdate(CHANNELS.BITACORA_UPDATED, tecnicoId, {
+    action: "deleted",
+    bitacoraId,
+  });
+
   return { message: "Bitácora eliminada" };
 }
