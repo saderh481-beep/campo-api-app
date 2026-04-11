@@ -12,7 +12,7 @@ import type {
 export async function obtenerAsignacionesTecnico(tecnicoId: string) {
   const [beneficiarios, actividades] = await Promise.all([
     sql<AsignacionBeneficiarioDetalle[]>`
-      SELECT
+      SELECT DISTINCT ON (ab.beneficiario_id)
         ab.id,
         ab.tecnico_id,
         ab.beneficiario_id,
@@ -27,7 +27,8 @@ export async function obtenerAsignacionesTecnico(tecnicoId: string) {
       JOIN beneficiarios b ON b.id = ab.beneficiario_id
       WHERE ab.tecnico_id = ${tecnicoId}
         AND ab.activo = true
-      ORDER BY ab.asignado_en DESC, b.nombre ASC
+        AND b.activo = true
+      ORDER BY ab.beneficiario_id, ab.asignado_en DESC
     `,
     sql<AsignacionActividadDetalle[]>`
       SELECT
@@ -134,7 +135,7 @@ export async function obtenerAsignacionesTecnicoParaApp(tecnicoId: string) {
 export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
   try {
     return await sql<BeneficiarioConCadenas[]>`
-      SELECT b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
+      SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
              b.telefono_principal, b.telefono_secundario,
              CASE
                WHEN b.coord_parcela IS NULL THEN NULL
@@ -154,7 +155,7 @@ export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
       WHERE ab.tecnico_id = ${tecnicoId}
         AND ab.activo = true
         AND b.activo = true
-      ORDER BY b.nombre
+      ORDER BY b.id, b.nombre
     `;
   } catch (error) {
     if ((error as { code?: string })?.code !== "42703") {
@@ -163,7 +164,7 @@ export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
   }
 
   return await sql<BeneficiarioConCadenas[]>`
-    SELECT b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
+    SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
            b.telefono_principal, b.telefono_secundario,
            CASE
              WHEN b.coord_parcela IS NULL THEN NULL
@@ -179,7 +180,8 @@ export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
     FROM asignaciones_beneficiario ab
     JOIN beneficiarios b ON b.id = ab.beneficiario_id
     WHERE ab.tecnico_id = ${tecnicoId}
-    ORDER BY b.nombre
+      AND b.activo = true
+    ORDER BY b.id, b.nombre
   `;
 }
 

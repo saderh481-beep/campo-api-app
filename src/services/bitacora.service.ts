@@ -20,6 +20,16 @@ export async function crearBitacora(
     fecha_inicio: string;
     coord_inicio?: string;
     sync_id?: string;
+    actividades_desc?: string;
+    recomendaciones?: string;
+    comentarios_beneficiario?: string;
+    coordinacion_interinst?: boolean;
+    instancia_coordinada?: string;
+    proposito_coordinacion?: string;
+    observaciones_coordinador?: string;
+    calificacion?: number;
+    reporte?: string;
+    datos_extendidos?: Record<string, unknown>;
   }
 ) {
   // Verificar si ya existe por sync_id
@@ -37,14 +47,27 @@ export async function crearBitacora(
   const [nueva] = await sql<BitacoraResumen[]>`
     INSERT INTO bitacoras (
       tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id,
-      beneficiario_id, cadena_productiva_id, actividad_id
+      beneficiario_id, cadena_productiva_id, actividad_id,
+      actividades_desc, recomendaciones, comentarios_beneficiario,
+      coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
+      observaciones_coordinador, calificacion, reporte, datos_extendidos
     ) VALUES (
       ${tecnicoId}, ${data.tipo}, 'borrador', ${data.fecha_inicio},
       ${data.coord_inicio ?? null},
       ${data.sync_id ?? null},
       ${data.beneficiario_id ?? null},
       ${data.tipo === "beneficiario" ? data.cadena_productiva_id ?? null : null},
-      ${data.actividad_id ?? null}
+      ${data.actividad_id ?? null},
+      ${data.actividades_desc ?? null},
+      ${data.recomendaciones ?? null},
+      ${data.comentarios_beneficiario ?? null},
+      ${data.coordinacion_interinst ?? null},
+      ${data.instancia_coordinada ?? null},
+      ${data.proposito_coordinacion ?? null},
+      ${data.observaciones_coordinador ?? null},
+      ${data.calificacion ?? null},
+      ${data.reporte ?? null},
+      ${data.datos_extendidos ? JSON.stringify(data.datos_extendidos) : null}
     )
     RETURNING id, tipo, estado, fecha_inicio, sync_id
   `;
@@ -152,6 +175,13 @@ export async function actualizarBitacora(
     fecha_fin?: string;
     recomendaciones?: string;
     comentarios_beneficiario?: string;
+    estado?: string;
+    coordinacion_interinst?: boolean;
+    instancia_coordinada?: string;
+    proposito_coordinacion?: string;
+    calificacion?: number;
+    reporte?: string;
+    datos_extendidos?: Record<string, unknown>;
   }
 ) {
   const [bitacora] = await sql<Bitacora[]>`
@@ -198,6 +228,34 @@ export async function actualizarBitacora(
     updates.push(`comentarios_beneficiario = $${paramIndex++}`);
     params.push(data.comentarios_beneficiario);
   }
+  if (data.estado !== undefined) {
+    updates.push(`estado = $${paramIndex++}`);
+    params.push(data.estado);
+  }
+  if (data.coordinacion_interinst !== undefined) {
+    updates.push(`coordinacion_interinst = $${paramIndex++}`);
+    params.push(data.coordinacion_interinst);
+  }
+  if (data.instancia_coordinada !== undefined) {
+    updates.push(`instancia_coordinada = $${paramIndex++}`);
+    params.push(data.instancia_coordinada);
+  }
+  if (data.proposito_coordinacion !== undefined) {
+    updates.push(`proposito_coordinacion = $${paramIndex++}`);
+    params.push(data.proposito_coordinacion);
+  }
+  if (data.calificacion !== undefined) {
+    updates.push(`calificacion = $${paramIndex++}`);
+    params.push(data.calificacion);
+  }
+  if (data.reporte !== undefined) {
+    updates.push(`reporte = $${paramIndex++}`);
+    params.push(data.reporte);
+  }
+  if (data.datos_extendidos !== undefined) {
+    updates.push(`datos_extendidos = $${paramIndex++}`);
+    params.push(JSON.stringify(data.datos_extendidos));
+  }
 
   if (updates.length === 0) {
     return { error: "No hay campos para actualizar" };
@@ -221,7 +279,13 @@ export async function actualizarBitacora(
       observaciones_coordinador,
       actividades_desc,
       recomendaciones,
-      comentarios_beneficiario
+      comentarios_beneficiario,
+      coordinacion_interinst,
+      instancia_coordinada,
+      proposito_coordinacion,
+      calificacion,
+      reporte,
+      datos_extendidos
   `;
 
   const [actualizada] = await sql.unsafe(query, params);

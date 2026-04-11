@@ -249,11 +249,12 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
     asignacionesActividad,
   ] = await Promise.all([
     sql`
-      SELECT DISTINCT b.id, b.nombre, b.municipio, b.localidad, b.updated_at
+      SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.updated_at
       FROM beneficiarios b
       JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
       WHERE ab.tecnico_id = ${tecnicoId}
         AND ab.activo = true
+        AND b.activo = true
         AND b.updated_at > ${desde.toISOString()}
     `,
     sql`

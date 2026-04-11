@@ -30,6 +30,9 @@ export interface Bitacora {
   pdf_edicion: Record<string, unknown>;
   beneficiario_nombre?: string;
   actividad_nombre?: string;
+  calificacion: number | null;
+  reporte: string | null;
+  datos_extendidos: Record<string, unknown> | null;
 }
 
 export interface BitacoraResumen {

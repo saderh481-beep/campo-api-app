@@ -27,7 +27,20 @@ const app = new Hono<{
 
 app.use("*", authMiddleware);
 
-const schemaBitacoraTipoA = z.object({
+const schemaBitacoraBase = z.object({
+  actividades_desc: z.string().optional(),
+  recomendaciones: z.string().optional(),
+  comentarios_beneficiario: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  observaciones_coordinador: z.string().optional(),
+  calificacion: z.number().int().min(1).max(10).optional(),
+  reporte: z.string().optional(),
+  datos_extendidos: z.record(z.unknown()).optional(),
+});
+
+const schemaBitacoraTipoA = schemaBitacoraBase.extend({
   tipo: z.literal("beneficiario"),
   beneficiario_id: z.string().uuid(),
   cadena_productiva_id: z.string().uuid().optional(),
@@ -36,7 +49,7 @@ const schemaBitacoraTipoA = z.object({
   sync_id: z.string().optional(),
 });
 
-const schemaBitacoraTipoB = z.object({
+const schemaBitacoraTipoB = schemaBitacoraBase.extend({
   tipo: z.literal("actividad"),
   actividad_id: z.string().uuid(),
   fecha_inicio: z.string().datetime(),
@@ -58,6 +71,16 @@ app.post("/", zValidator("json", schemaBitacora), async (c) => {
     fecha_inicio: body.fecha_inicio,
     coord_inicio: body.coord_inicio,
     sync_id: body.sync_id,
+    actividades_desc: body.actividades_desc,
+    recomendaciones: body.recomendaciones,
+    comentarios_beneficiario: body.comentarios_beneficiario,
+    coordinacion_interinst: body.coordinacion_interinst,
+    instancia_coordinada: body.instancia_coordinada,
+    proposito_coordinacion: body.proposito_coordinacion,
+    observaciones_coordinador: body.observaciones_coordinador,
+    calificacion: body.calificacion,
+    reporte: body.reporte,
+    datos_extendidos: body.datos_extendidos,
   });
 
   if ("duplicado" in resultado && resultado.duplicado) {
@@ -116,6 +139,13 @@ const schemaActualizarBitacora = z.object({
   fecha_fin: z.string().datetime().optional(),
   recomendaciones: z.string().optional(),
   comentarios_beneficiario: z.string().optional(),
+  estado: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  calificacion: z.number().int().min(1).max(10).optional(),
+  reporte: z.string().optional(),
+  datos_extendidos: z.record(z.unknown()).optional(),
 });
 
 app.patch("/:id", zValidator("json", schemaActualizarBitacora), async (c) => {
