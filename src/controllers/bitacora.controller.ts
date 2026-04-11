@@ -448,6 +448,15 @@ app.delete("/:id/fotos-campo/:idx", async (c) => {
 const schemaCerrarBitacora = z.object({
   fecha_fin: z.string().datetime(),
   coord_fin: z.string().optional(),
+  actividades_desc: z.string().optional(),
+  recomendaciones: z.string().optional(),
+  comentarios_beneficiario: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  calificacion: z.number().int().min(1).max(10).optional(),
+  reporte: z.string().optional(),
+  datos_extendidos: z.record(z.unknown()).optional(),
 });
 
 app.post("/:id/cerrar", zValidator("json", schemaCerrarBitacora), async (c) => {

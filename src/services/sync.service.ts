@@ -126,10 +126,13 @@ export async function sincronizarOperaciones(
           continue;
         }
 
-        const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           INSERT INTO bitacoras (
             tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id, creada_offline,
-            beneficiario_id, cadena_productiva_id, actividad_id
+            beneficiario_id, cadena_productiva_id, actividad_id,
+            actividades_desc, recomendaciones, comentarios_beneficiario,
+            coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
+            calificacion, reporte, datos_extendidos
           ) VALUES (
             ${tecnicoId}, ${String(p.tipo)}, 'borrador', ${String((p.fecha_inicio as string | null) ?? op.timestamp)},
             ${(p.coord_inicio as string | null) ?? null},
@@ -137,7 +140,16 @@ export async function sincronizarOperaciones(
             true,
             ${(p.beneficiario_id as string | null) ?? null},
             ${(p.cadena_productiva_id as string | null) ?? null},
-            ${(p.actividad_id as string | null) ?? null}
+            ${(p.actividad_id as string | null) ?? null},
+            ${(p.actividades_desc as string | null) ?? ''},
+            ${(p.recomendaciones as string | null) ?? ''},
+            ${(p.comentarios_beneficiario as string | null) ?? ''},
+            ${(p.coordinacion_interinst as boolean | null) ?? null},
+            ${(p.instancia_coordinada as string | null) ?? null},
+            ${(p.proposito_coordinacion as string | null) ?? null},
+            ${(p.calificacion as number | null) ?? null},
+            ${(p.reporte as string | null) ?? null},
+            ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null}
           )
           RETURNING id, estado, updated_at
         `;
@@ -163,15 +175,21 @@ export async function sincronizarOperaciones(
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
 
-        const [actualizada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+const [actualizada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           UPDATE bitacoras SET
-            actividades_desc = COALESCE(${(p.actividades_desc as string | null) ?? null}, actividades_desc),
+            actividades_desc = COALESCE(NULLIF(${p.actividades_desc as string | null}, ''), actividades_desc),
             coord_inicio = COALESCE(${(p.coord_inicio as string | null) ?? null}, coord_inicio),
             coord_fin = COALESCE(${(p.coord_fin as string | null) ?? null}, coord_fin),
             fecha_inicio = COALESCE(${(p.fecha_inicio as string | null) ?? null}, fecha_inicio),
             fecha_fin = COALESCE(${(p.fecha_fin as string | null) ?? null}, fecha_fin),
-            recomendaciones = COALESCE(${(p.recomendaciones as string | null) ?? null}, recomendaciones),
-            comentarios_beneficiario = COALESCE(${(p.comentarios_beneficiario as string | null) ?? null}, comentarios_beneficiario),
+            recomendaciones = COALESCE(NULLIF(${p.recomendaciones as string | null}, ''), recomendaciones),
+            comentarios_beneficiario = COALESCE(NULLIF(${p.comentarios_beneficiario as string | null}, ''), comentarios_beneficiario),
+            coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? null},
+            instancia_coordinada = COALESCE(NULLIF(${p.instancia_coordinada as string | null}, ''), instancia_coordinada),
+            proposito_coordinacion = COALESCE(NULLIF(${p.proposito_coordinacion as string | null}, ''), proposito_coordinacion),
+            calificacion = ${(p.calificacion as number | null) ?? null},
+            reporte = COALESCE(NULLIF(${p.reporte as string | null}, ''), reporte),
+            datos_extendidos = ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : datos_extendidos},
             updated_at = NOW()
           WHERE sync_id = ${String(p.sync_id)}
             AND tecnico_id = ${tecnicoId}

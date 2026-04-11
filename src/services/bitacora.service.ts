@@ -58,9 +58,9 @@ export async function crearBitacora(
       ${data.beneficiario_id ?? null},
       ${data.tipo === "beneficiario" ? data.cadena_productiva_id ?? null : null},
       ${data.actividad_id ?? null},
-      ${data.actividades_desc ?? null},
-      ${data.recomendaciones ?? null},
-      ${data.comentarios_beneficiario ?? null},
+      ${data.actividades_desc ?? ''},
+${data.recomendaciones ?? ''},
+${data.comentarios_beneficiario ?? ''},
       ${data.coordinacion_interinst ?? null},
       ${data.instancia_coordinada ?? null},
       ${data.proposito_coordinacion ?? null},
@@ -409,7 +409,19 @@ export async function guardarFotosCampoUrls(
 export async function cerrarBitacora(
   tecnicoId: string,
   bitacoraId: string,
-  data: { fecha_fin: string; coord_fin?: string }
+  data: { 
+    fecha_fin: string; 
+    coord_fin?: string;
+    actividades_desc?: string;
+    recomendaciones?: string;
+    comentarios_beneficiario?: string;
+    coordinacion_interinst?: boolean;
+    instancia_coordinada?: string;
+    proposito_coordinacion?: string;
+    calificacion?: number;
+    reporte?: string;
+    datos_extendidos?: Record<string, unknown>;
+  }
 ) {
   try {
     const [bitacora] = await sql<Bitacora[]>`
@@ -420,11 +432,28 @@ export async function cerrarBitacora(
       return { error: "La bitácora ya está cerrada" };
     }
 
+    const actividadDesc = data.actividades_desc || '';
+    const recomendacionesTxt = data.recomendaciones || '';
+    const comentariosTxt = data.comentarios_beneficiario || '';
+    const instanciaTxt = data.instancia_coordinada || '';
+    const propositoTxt = data.proposito_coordinacion || '';
+    const reporteTxt = data.reporte || '';
+    const datosExt = data.datos_extendidos ? JSON.stringify(data.datos_extendidos) : null;
+
     const [cerrada] = await sql<Bitacora[]>`
       UPDATE bitacoras SET
         estado = 'cerrada',
         fecha_fin = ${data.fecha_fin},
         coord_fin = ${data.coord_fin ?? null},
+        actividades_desc = CASE WHEN ${actividadDesc} = '' THEN actividades_desc ELSE ${actividadDesc} END,
+        recomendaciones = CASE WHEN ${recomendacionesTxt} = '' THEN recomendaciones ELSE ${recomendacionesTxt} END,
+        comentarios_beneficiario = CASE WHEN ${comentariosTxt} = '' THEN comentarios_beneficiario ELSE ${comentariosTxt} END,
+        coordinacion_interinst = ${data.coordinacion_interinst ?? bitacora.coordinacion_interinst ?? null},
+        instancia_coordinada = CASE WHEN ${instanciaTxt} = '' THEN instancia_coordinada ELSE ${instanciaTxt} END,
+        proposito_coordinacion = CASE WHEN ${propositoTxt} = '' THEN proposito_coordinacion ELSE ${propositoTxt} END,
+        calificacion = COALESCE(${data.calificacion}, calificacion),
+        reporte = CASE WHEN ${reporteTxt} = '' THEN reporte ELSE ${reporteTxt} END,
+        datos_extendidos = COALESCE(${datosExt}, datos_extendidos),
         updated_at = NOW()
       WHERE id = ${bitacoraId}
       RETURNING *
@@ -454,6 +483,8 @@ export async function cerrarBitacora(
       `;
     } catch (pdfErr) {
       console.error("Error al generar/subir PDF:", pdfErr);
+    } finally {
+      // Always return success even if PDF fails
     }
 
     // Notificación al técnico
