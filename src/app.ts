@@ -33,7 +33,7 @@ app.use(
 );
 
 app.get("/health", (c) =>
-  c.json({ status: "ok", service: "api-app", ts: new Date().toISOString() })
+  c.text("OK", 200)
 );
 
 app.get("/version", (c) =>
