@@ -144,11 +144,11 @@ const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>
             ${(p.actividades_desc as string | null) ?? ''},
             ${(p.recomendaciones as string | null) ?? ''},
             ${(p.comentarios_beneficiario as string | null) ?? ''},
-            ${(p.coordinacion_interinst as boolean | null) ?? null},
-            ${(p.instancia_coordinada as string | null) ?? null},
-            ${(p.proposito_coordinacion as string | null) ?? null},
-            ${(p.calificacion as number | null) ?? null},
-            ${(p.reporte as string | null) ?? null},
+${(p.coordinacion_interinst as boolean | null) ?? false},
+${(p.instancia_coordinada as string | null) ?? ''},
+${(p.proposito_coordinacion as string | null) ?? ''},
+${(p.calificacion as number | null) ?? null},
+${(p.reporte as string | null) ?? ''},
             ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null}
           )
           RETURNING id, estado, updated_at
@@ -184,7 +184,7 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
             fecha_fin = COALESCE(${(p.fecha_fin as string | null) ?? null}, fecha_fin),
             recomendaciones = COALESCE(NULLIF(${p.recomendaciones as string | null}, ''), recomendaciones),
             comentarios_beneficiario = COALESCE(NULLIF(${p.comentarios_beneficiario as string | null}, ''), comentarios_beneficiario),
-            coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? null},
+            coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? false},
             instancia_coordinada = COALESCE(NULLIF(${p.instancia_coordinada as string | null}, ''), instancia_coordinada),
             proposito_coordinacion = COALESCE(NULLIF(${p.proposito_coordinacion as string | null}, ''), proposito_coordinacion),
             calificacion = ${(p.calificacion as number | null) ?? null},
