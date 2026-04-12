@@ -5,12 +5,17 @@ import { env, requireEnv } from "@/config/env";
 let configured = false;
 
 function cloudinaryEnvConfigured() {
-  const configured = Boolean(
+  const hasCredentials = Boolean(
     env.CLOUDINARY_CLOUD_NAME?.trim() &&
       env.CLOUDINARY_API_KEY?.trim() &&
       env.CLOUDINARY_API_SECRET?.trim()
   );
-  console.log("[Cloudinary] envConfigured:", configured, "cloudName:", env.CLOUDINARY_CLOUD_NAME);
+  const hasPresets = Boolean(
+    env.CLOUDINARY_PRESET_IMAGENES?.trim() ||
+      env.CLOUDINARY_PRESET_DOCS?.trim()
+  );
+  const configured = hasCredentials && hasPresets;
+  console.log("[Cloudinary] envConfigured:", configured, "cloudName:", env.CLOUDINARY_CLOUD_NAME, "hasPresets:", hasPresets);
   return configured;
 }
 
@@ -83,8 +88,10 @@ function upload(
   options: UploadApiOptions,
   fallbackMimeType: string
 ): Promise<{ secure_url: string; public_id: string }> {
+  console.log("[Cloudinary] Intentando subir, tiene credenciales:", cloudinaryEnvConfigured(), "preset:", options.upload_preset);
+  
   if (!cloudinaryEnvConfigured()) {
-    console.log("[Cloudinary] No configurado, retornando data URL");
+    console.log("[Cloudinary] No configurado completamente, retornando data URL");
     return Promise.resolve({
       secure_url: buildDataUrl(buffer, fallbackMimeType),
       public_id: String(options.public_id ?? `local-${Date.now()}`),
@@ -95,23 +102,27 @@ function upload(
 
   console.log("[Cloudinary] Subiendo con preset:", options.upload_preset, "folder:", options.folder);
 
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream(options, (err, result) => {
-        if (err || !result) {
-          console.error("[Cloudinary] Error uploading:", err);
-          return reject(err ?? new Error("Upload failed"));
-        }
-        console.log("[Cloudinary] Upload exitoso:", result.secure_url);
-        resolve({ secure_url: result.secure_url, public_id: result.public_id });
-      })
-      .end(buffer);
-  });
+  // Use base64 encoding for buffer upload - more reliable for Node.js
+  const base64 = buffer.toString("base64");
+  const mimeType = fallbackMimeType.includes("webp") ? "image/webp" : fallbackMimeType.includes("png") ? "image/png" : "image/jpeg";
+  const dataUri = `data:${mimeType};base64,${base64}`;
+
+  return cloudinary.uploader.upload(dataUri, options)
+    .then((result) => {
+      console.log("[Cloudinary] Upload exitoso:", result.secure_url);
+      return { secure_url: result.secure_url, public_id: result.public_id };
+    })
+    .catch((err) => {
+      console.error("[Cloudinary] Error uploading:", err);
+      throw err;
+    });
 }
 
 export async function subirFotoRostro(buffer: Buffer, bitacoraId: string) {
+  const preset = requireEnv("CLOUDINARY_PRESET_IMAGENES");
+  console.log("[Cloudinary] subirFotoRostro preset:", preset);
   return upload(buffer, {
-    upload_preset: requireEnv("CLOUDINARY_PRESET_IMAGENES"),
+    upload_preset: preset,
     folder: `campo/rostros/${bitacoraId}`,
     public_id: `rostro-${bitacoraId}`,
     resource_type: "image",
