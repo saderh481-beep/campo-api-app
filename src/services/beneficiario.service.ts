@@ -9,6 +9,12 @@ import type {
   AsignacionActividadDetalle,
 } from "@/models";
 
+function generateFolioSaderh(): string {
+  const year = new Date().getFullYear();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `SADERH-${year}-${random}`;
+}
+
 export async function obtenerAsignacionesTecnico(tecnicoId: string) {
   const [beneficiarios, actividades] = await Promise.all([
     sql<AsignacionBeneficiarioDetalle[]>`
@@ -223,11 +229,16 @@ export async function crearBeneficiario(
     folio_saderh?: string;
   }
 ) {
+  const folioSaderh = data.folio_saderh || generateFolioSaderh();
+  const curp = data.curp || null;
+
   const [nuevoBeneficiario] = await sql`
     INSERT INTO beneficiarios (
-      nombre, municipio, localidad, telefono_principal, tecnico_id
+      nombre, curp, folio_saderh, municipio, localidad, telefono_principal, tecnico_id
     ) VALUES (
       ${data.nombre},
+      ${curp},
+      ${folioSaderh},
       ${data.municipio},
       ${data.localidad},
       ${data.telefono},
@@ -272,7 +283,7 @@ export async function crearBeneficiario(
 
   // Retornar beneficiario completo
   const [beneficiario] = await sql<BeneficiarioConCadenas[]>`
-    SELECT b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
+    SELECT b.id, b.nombre, b.curp, b.folio_saderh, b.municipio, b.localidad, b.direccion, b.cp,
            b.telefono_principal, b.telefono_secundario,
            CASE
              WHEN b.coord_parcela IS NULL THEN NULL

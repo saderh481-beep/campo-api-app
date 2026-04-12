@@ -126,10 +126,7 @@ export async function subirFotoRostro(buffer: Buffer, bitacoraId: string) {
     folder: `campo/rostros/${bitacoraId}`,
     public_id: `rostro-${bitacoraId}`,
     resource_type: "image",
-    transformation: [
-      { width: 400, height: 400, crop: "fill", gravity: "face", quality: 80, fetch_format: "webp" },
-    ],
-  }, "image/webp");
+  }, "image/jpeg");
 }
 
 export async function subirFirma(buffer: Buffer, bitacoraId: string) {

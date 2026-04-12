@@ -2,6 +2,8 @@ export interface Beneficiario {
   id: string;
   tecnico_id: string;
   nombre: string;
+  curp: string | null;
+  folio_saderh: string | null;
   municipio: string;
   localidad: string | null;
   direccion: string | null;
