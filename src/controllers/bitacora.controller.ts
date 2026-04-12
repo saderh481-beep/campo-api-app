@@ -209,12 +209,15 @@ app.post("/:id/fotos-campo", async (c) => {
 
   const formData = await c.req.formData();
   const archivos = formData.getAll("fotos").filter((f): f is File => f instanceof File);
-  if (archivos.length === 0) {
+  const archivosArray = formData.getAll("fotos[]").filter((f): f is File => f instanceof File);
+  const todosArchivos = [...archivos, ...archivosArray];
+  
+  if (todosArchivos.length === 0) {
     return c.json({ error: "Se requiere al menos una foto como archivo" }, 400);
   }
 
   const buffers: Buffer[] = [];
-  for (const archivo of archivos) {
+  for (const archivo of todosArchivos) {
     const arrayBuffer = await archivo.arrayBuffer();
     buffers.push(Buffer.from(arrayBuffer));
   }
