@@ -1,6 +1,12 @@
 import { sql } from "@/db";
 import type { BitacoraResumen, Beneficiario } from "@/models";
 
+function validarUUID(valor: unknown): boolean {
+  if (!valor || typeof valor !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(valor);
+}
+
 export async function sincronizarOperaciones(
   tecnicoId: string,
   operaciones: Array<{
@@ -126,7 +132,11 @@ export async function sincronizarOperaciones(
           continue;
         }
 
-const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+const beneficiarioId = validarUUID(p.beneficiario_id) ? p.beneficiario_id : null;
+        const cadenaProductivaId = validarUUID(p.cadena_productiva_id) ? p.cadena_productiva_id : null;
+        const actividadId = validarUUID(p.actividad_id) ? p.actividad_id : null;
+
+        const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           INSERT INTO bitacoras (
             tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id, creada_offline,
             beneficiario_id, cadena_productiva_id, actividad_id,
@@ -138,9 +148,9 @@ const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>
             ${(p.coord_inicio as string | null) ?? null},
             ${String(p.sync_id)},
             true,
-            ${(p.beneficiario_id as string | null) ?? null},
-            ${(p.cadena_productiva_id as string | null) ?? null},
-            ${(p.actividad_id as string | null) ?? null},
+            ${beneficiarioId},
+            ${cadenaProductivaId},
+            ${actividadId},
             ${(p.actividades_desc as string | null) ?? ''},
             ${(p.recomendaciones as string | null) ?? ''},
             ${(p.comentarios_beneficiario as string | null) ?? ''},
