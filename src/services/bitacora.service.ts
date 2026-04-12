@@ -347,8 +347,9 @@ export async function subirFotosCampoBitacora(
   }
 
   const todasLasUrls = [...existentes, ...nuevasUrls];
+  const fotosArray = JSON.stringify(todasLasUrls);
   await sql`
-    UPDATE bitacoras SET fotos_campo = ${JSON.stringify(todasLasUrls)}, updated_at = NOW() WHERE id = ${bitacoraId}
+    UPDATE bitacoras SET fotos_campo = ${fotosArray}::jsonb, updated_at = NOW() WHERE id = ${bitacoraId}
   `;
   return { fotos_campo: todasLasUrls };
 }
@@ -399,9 +400,10 @@ export async function guardarFotosCampoUrls(
 
   const nuevasUrls = urls.slice(0, disponibles);
   const todasLasUrls = [...existentes, ...nuevasUrls];
+  const fotosArray = JSON.stringify(todasLasUrls);
 
   await sql`
-    UPDATE bitacoras SET fotos_campo = ${JSON.stringify(todasLasUrls)}, updated_at = NOW() WHERE id = ${bitacoraId}
+    UPDATE bitacoras SET fotos_campo = ${fotosArray}::jsonb, updated_at = NOW() WHERE id = ${bitacoraId}
   `;
   return { fotos_campo: todasLasUrls };
 }
