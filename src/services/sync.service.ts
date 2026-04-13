@@ -7,6 +7,12 @@ function validarUUID(valor: unknown): boolean {
   return uuidRegex.test(valor);
 }
 
+function validarSyncId(valor: unknown): string | null {
+  if (!valor || typeof valor !== 'string') return null;
+  if (valor.length === 0 || valor.length > 200) return null;
+  return valor;
+}
+
 export async function sincronizarOperaciones(
   tecnicoId: string,
   operaciones: Array<{
@@ -108,14 +114,15 @@ export async function sincronizarOperaciones(
           VALUES (${tecnicoId}, 'tecnico', 'beneficiario_creado', 'Nuevo beneficiario registrado', ${String(p.nombre) + ' ha sido registrado exitosamente'})
         `;
 
-      } else if (op.operacion === "crear_bitacora") {
+} else if (op.operacion === "crear_bitacora") {
         const p = op.payload;
+        const syncId = validarSyncId(p.sync_id);
+        if (!syncId) throw new Error("sync_id requerido");
 
-        if (!p.sync_id) throw new Error("sync_id requerido");
         const [existente] = await sql<BitacoraResumen[]>`
-          SELECT id, estado, sync_id, fecha_inicio, fecha_fin
+          SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
           FROM bitacoras
-          WHERE sync_id = ${String(p.sync_id)}
+          WHERE sync_id = ${syncId}
             AND tecnico_id = ${tecnicoId}
         `;
         if (existente) {
@@ -142,12 +149,12 @@ const beneficiarioId = validarUUID(p.beneficiario_id) ? p.beneficiario_id : null
             beneficiario_id, cadena_productiva_id, actividad_id,
             actividades_desc, recomendaciones, comentarios_beneficiario,
             coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
-            calificacion, reporte, datos_extendidos
+            calificacion, reporte, datos_extendidos, fotos_campo
           ) VALUES (
             ${tecnicoId}, ${String(p.tipo)}, 'borrador', ${String((p.fecha_inicio as string | null) ?? op.timestamp)},
             ${(p.coord_inicio as string | null) ?? null},
-            ${String(p.sync_id)},
-            true,
+            ${syncId},
+            ${(p.creada_offline as boolean | null) ?? false},
             ${beneficiarioId},
             ${cadenaProductivaId},
             ${actividadId},
@@ -159,7 +166,8 @@ ${(p.instancia_coordinada as string | null) ?? ''},
 ${(p.proposito_coordinacion as string | null) ?? ''},
 ${(p.calificacion as number | null) ?? null},
 ${(p.reporte as string | null) ?? ''},
-            ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null}
+            ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null},
+            ${(p.fotos_campo as string[] | null) ? JSON.stringify(p.fotos_campo) : null}
           )
           RETURNING id, estado, updated_at
         `;
@@ -175,12 +183,13 @@ ${(p.reporte as string | null) ?? ''},
           updated_at: creada.updated_at,
         });
 
-      } else if (op.operacion === "editar_bitacora") {
+} else if (op.operacion === "editar_bitacora") {
         const p = op.payload;
+        const syncId = validarSyncId(p.sync_id);
+        if (!syncId) throw new Error("sync_id requerido");
 
-        if (!p.sync_id) throw new Error("sync_id requerido");
         const [bitacora] = await sql<BitacoraResumen[]>`
-          SELECT id, estado FROM bitacoras WHERE sync_id = ${String(p.sync_id)} AND tecnico_id = ${tecnicoId}
+          SELECT id, estado FROM bitacoras WHERE sync_id = ${syncId} AND tecnico_id = ${tecnicoId}
         `;
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
@@ -200,8 +209,9 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
             calificacion = ${(p.calificacion as number | null) ?? null},
             reporte = COALESCE(NULLIF(${p.reporte as string | null}, ''), reporte),
             datos_extendidos = ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : datos_extendidos},
+            fotos_campo = COALESCE(${p.fotos_campo ? JSON.stringify(p.fotos_campo) : null}, fotos_campo),
             updated_at = NOW()
-          WHERE sync_id = ${String(p.sync_id)}
+          WHERE sync_id = ${syncId}
             AND tecnico_id = ${tecnicoId}
           RETURNING id, estado, updated_at
         `;
@@ -217,23 +227,42 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
           updated_at: actualizada.updated_at,
         });
 
-      } else if (op.operacion === "cerrar_bitacora") {
+} else if (op.operacion === "cerrar_bitacora") {
         const p = op.payload;
+        const syncId = validarSyncId(p.sync_id);
+        if (!syncId) throw new Error("sync_id requerido");
 
-        if (!p.sync_id) throw new Error("sync_id requerido");
         const [bitacora] = await sql<BitacoraResumen[]>`
-          SELECT id, estado FROM bitacoras WHERE sync_id = ${String(p.sync_id)} AND tecnico_id = ${tecnicoId}
+          SELECT id, estado FROM bitacoras WHERE sync_id = ${syncId} AND tecnico_id = ${tecnicoId}
         `;
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("La bitácora ya está cerrada");
+
+        const actividadDesc = (p.actividades_desc as string | null) ?? '';
+        const recomendacionesTxt = (p.recomendaciones as string | null) ?? '';
+        const comentariosTxt = (p.comentarios_beneficiario as string | null) ?? '';
+        const instanciaTxt = (p.instancia_coordinada as string | null) ?? '';
+        const propositoTxt = (p.proposito_coordinacion as string | null) ?? '';
+        const reporteTxt = (p.reporte as string | null) ?? '';
+        const datosExt = (p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null;
+        const calif = (p.calificacion as number | null) ?? null;
 
         const [cerrada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           UPDATE bitacoras SET
             estado = 'cerrada',
             fecha_fin = ${String(p.fecha_fin)},
             coord_fin = ${(p.coord_fin as string | null) ?? null},
+            actividades_desc = CASE WHEN ${actividadDesc} = '' THEN actividades_desc ELSE ${actividadDesc} END,
+            recomendaciones = CASE WHEN ${recomendacionesTxt} = '' THEN recomendaciones ELSE ${recomendacionesTxt} END,
+            comentarios_beneficiario = CASE WHEN ${comentariosTxt} = '' THEN comentarios_beneficiario ELSE ${comentariosTxt} END,
+            coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? false},
+            instancia_coordinada = CASE WHEN ${instanciaTxt} = '' THEN instancia_coordinada ELSE ${instanciaTxt} END,
+            proposito_coordinacion = CASE WHEN ${propositoTxt} = '' THEN proposito_coordinacion ELSE ${propositoTxt} END,
+            calificacion = ${calif},
+            reporte = CASE WHEN ${reporteTxt} = '' THEN reporte ELSE ${reporteTxt} END,
+            datos_extendidos = ${datosExt},
             updated_at = NOW()
-          WHERE sync_id = ${String(p.sync_id)}
+          WHERE sync_id = ${syncId}
             AND tecnico_id = ${tecnicoId}
           RETURNING id, estado, updated_at
         `;

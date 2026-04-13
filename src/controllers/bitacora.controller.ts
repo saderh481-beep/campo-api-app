@@ -443,7 +443,7 @@ app.delete("/:id/fotos-campo/:idx", async (c) => {
 
   urls.splice(index, 1);
 
-  await sql`UPDATE bitacoras SET fotos_campo = ${JSON.stringify(urls)}, updated_at = NOW() WHERE id = ${id}`;
+  await sql`UPDATE bitacoras SET fotos_campo = ${JSON.stringify(urls)}::jsonb, updated_at = NOW() WHERE id = ${id}`;
 
   return c.json({ urls });
 });
