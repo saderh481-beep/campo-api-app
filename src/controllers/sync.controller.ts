@@ -20,6 +20,19 @@ const schemaBitacoraTipoA = z.object({
   fecha_inicio: z.string().datetime().optional(),
   coord_inicio: z.string().optional(),
   sync_id: z.string(),
+  actividades_desc: z.string().optional(),
+  recomendaciones: z.string().optional(),
+  comentarios_beneficiario: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  observaciones_coordinador: z.string().optional(),
+  foto_rostro_url: z.string().optional(),
+  firma_url: z.string().optional(),
+  fotos_campo: z.array(z.string()).optional(),
+  calificacion: z.number().optional(),
+  reporte: z.string().optional(),
+  datos_extendidos: z.record(z.unknown()).optional(),
 });
 
 const schemaBitacoraTipoB = z.object({
@@ -28,6 +41,19 @@ const schemaBitacoraTipoB = z.object({
   fecha_inicio: z.string().datetime().optional(),
   coord_inicio: z.string().optional(),
   sync_id: z.string(),
+  actividades_desc: z.string().optional(),
+  recomendaciones: z.string().optional(),
+  comentarios_beneficiario: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  observaciones_coordinador: z.string().optional(),
+  foto_rostro_url: z.string().optional(),
+  firma_url: z.string().optional(),
+  fotos_campo: z.array(z.string()).optional(),
+  calificacion: z.number().optional(),
+  reporte: z.string().optional(),
+  datos_extendidos: z.record(z.unknown()).optional(),
 });
 
 const schemaCrearBitacoraPayload = z.union([schemaBitacoraTipoA, schemaBitacoraTipoB]);
@@ -54,12 +80,35 @@ const schemaEditarBitacoraPayload = z.object({
   fecha_fin: z.string().datetime().optional(),
   recomendaciones: z.string().optional(),
   comentarios_beneficiario: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  observaciones_coordinador: z.string().optional(),
+  foto_rostro_url: z.string().optional(),
+  firma_url: z.string().optional(),
+  fotos_campo: z.array(z.string()).optional(),
+  calificacion: z.number().optional(),
+  reporte: z.string().optional(),
+  datos_extendidos: z.record(z.unknown()).optional(),
 });
 
 const schemaCerrarBitacoraPayload = z.object({
   sync_id: z.string(),
   fecha_fin: z.string().datetime(),
   coord_fin: z.string().optional(),
+  actividades_desc: z.string().optional(),
+  recomendaciones: z.string().optional(),
+  comentarios_beneficiario: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  observaciones_coordinador: z.string().optional(),
+  foto_rostro_url: z.string().optional(),
+  firma_url: z.string().optional(),
+  fotos_campo: z.array(z.string()).optional(),
+  calificacion: z.number().optional(),
+  reporte: z.string().optional(),
+  datos_extendidos: z.record(z.unknown()).optional(),
 });
 
 const schemaOperacion = z.discriminatedUnion("operacion", [
