@@ -143,12 +143,13 @@ const beneficiarioId = validarUUID(p.beneficiario_id) ? p.beneficiario_id : null
         const cadenaProductivaId = validarUUID(p.cadena_productiva_id) ? p.cadena_productiva_id : null;
         const actividadId = validarUUID(p.actividad_id) ? p.actividad_id : null;
 
-        const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           INSERT INTO bitacoras (
             tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id, creada_offline,
             beneficiario_id, cadena_productiva_id, actividad_id,
             actividades_desc, recomendaciones, comentarios_beneficiario,
             coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
+            observaciones_coordinador, foto_rostro_url, firma_url,
             calificacion, reporte, datos_extendidos, fotos_campo
           ) VALUES (
             ${tecnicoId}, ${String(p.tipo)}, 'borrador', ${String((p.fecha_inicio as string | null) ?? op.timestamp)},
@@ -161,11 +162,14 @@ const beneficiarioId = validarUUID(p.beneficiario_id) ? p.beneficiario_id : null
             ${(p.actividades_desc as string | null) ?? ''},
             ${(p.recomendaciones as string | null) ?? ''},
             ${(p.comentarios_beneficiario as string | null) ?? ''},
-${(p.coordinacion_interinst as boolean | null) ?? false},
-${(p.instancia_coordinada as string | null) ?? ''},
-${(p.proposito_coordinacion as string | null) ?? ''},
-${(p.calificacion as number | null) ?? null},
-${(p.reporte as string | null) ?? ''},
+            ${(p.coordinacion_interinst as boolean | null) ?? false},
+            ${(p.instancia_coordinada as string | null) ?? ''},
+            ${(p.proposito_coordinacion as string | null) ?? ''},
+            ${(p.observaciones_coordinador as string | null) ?? null},
+            ${(p.foto_rostro_url as string | null) ?? null},
+            ${(p.firma_url as string | null) ?? null},
+            ${(p.calificacion as number | null) ?? null},
+            ${(p.reporte as string | null) ?? ''},
             ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null},
             ${(p.fotos_campo as string[] | null) ? JSON.stringify(p.fotos_campo) : null}
           )
@@ -206,6 +210,9 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
             coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? false},
             instancia_coordinada = COALESCE(NULLIF(${p.instancia_coordinada as string | null}, ''), instancia_coordinada),
             proposito_coordinacion = COALESCE(NULLIF(${p.proposito_coordinacion as string | null}, ''), proposito_coordinacion),
+            observaciones_coordinador = COALESCE(${p.observaciones_coordinador as string | null}, observaciones_coordinador),
+            foto_rostro_url = COALESCE(${p.foto_rostro_url as string | null}, foto_rostro_url),
+            firma_url = COALESCE(${p.firma_url as string | null}, firma_url),
             calificacion = ${(p.calificacion as number | null) ?? null},
             reporte = COALESCE(NULLIF(${p.reporte as string | null}, ''), reporte),
             datos_extendidos = ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : datos_extendidos},
@@ -246,6 +253,9 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
         const reporteTxt = (p.reporte as string | null) ?? '';
         const datosExt = (p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null;
         const calif = (p.calificacion as number | null) ?? null;
+        const obsCoordTxt = (p.observaciones_coordinador as string | null) ?? '';
+        const fotoRostroTxt = (p.foto_rostro_url as string | null) ?? '';
+        const firmaTxt = (p.firma_url as string | null) ?? '';
 
         const [cerrada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           UPDATE bitacoras SET
@@ -258,6 +268,9 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
             coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? false},
             instancia_coordinada = CASE WHEN ${instanciaTxt} = '' THEN instancia_coordinada ELSE ${instanciaTxt} END,
             proposito_coordinacion = CASE WHEN ${propositoTxt} = '' THEN proposito_coordinacion ELSE ${propositoTxt} END,
+            observaciones_coordinador = CASE WHEN ${obsCoordTxt} = '' THEN observaciones_coordinador ELSE ${obsCoordTxt} END,
+            foto_rostro_url = CASE WHEN ${fotoRostroTxt} = '' THEN foto_rostro_url ELSE ${fotoRostroTxt} END,
+            firma_url = CASE WHEN ${firmaTxt} = '' THEN firma_url ELSE ${firmaTxt} END,
             calificacion = ${calif},
             reporte = CASE WHEN ${reporteTxt} = '' THEN reporte ELSE ${reporteTxt} END,
             datos_extendidos = ${datosExt},
@@ -333,10 +346,13 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
       WHERE activo = true AND updated_at > ${desde.toISOString()}
       ORDER BY municipio, nombre
     `,
-    sql`
+sql`
       SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
              actividades_desc, recomendaciones, comentarios_beneficiario,
-             foto_rostro_url, firma_url, fotos_campo, pdf_url_actual, updated_at
+             coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
+             observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
+             pdf_version, pdf_url_actual, pdf_original_url, pdf_edicion,
+             calificacion, reporte, datos_extendidos, created_at, updated_at
       FROM bitacoras
       WHERE tecnico_id = ${tecnicoId}
         AND updated_at > ${desde.toISOString()}
