@@ -98,7 +98,7 @@ export async function obtenerBitacorasTecnico(
         ben.nombre as beneficiario_nombre, 
         act.nombre as actividad_nombre
       FROM bitacoras b
-      LEFT JOIN beneficiaries ben ON b.beneficiario_id = ben.id
+      LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
       LEFT JOIN actividades act ON b.actividad_id = act.id
       WHERE b.tecnico_id = $1 AND b.estado = $2
       ORDER BY b.fecha_inicio DESC
@@ -107,7 +107,7 @@ export async function obtenerBitacorasTecnico(
         ben.nombre as beneficiario_nombre, 
         act.nombre as actividad_nombre
       FROM bitacoras b
-      LEFT JOIN beneficiaries ben ON b.beneficiario_id = ben.id
+      LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
       LEFT JOIN actividades act ON b.actividad_id = act.id
       WHERE b.tecnico_id = $1
       ORDER BY b.fecha_inicio DESC
@@ -130,7 +130,7 @@ export async function obtenerBitacoraPorId(tecnicoId: string, bitacoraId: string
       ben.nombre as beneficiario_nombre, 
       act.nombre as actividad_nombre
     FROM bitacoras b
-    LEFT JOIN beneficiaries ben ON b.beneficiario_id = ben.id
+    LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
     LEFT JOIN actividades act ON b.actividad_id = act.id
     WHERE b.id = $1 AND b.tecnico_id = $2
   `, [bitacoraId, tecnicoId]);
