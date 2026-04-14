@@ -154,10 +154,27 @@ app.get("/sync/delta", async (c) => {
   const tecnico = c.get("tecnico");
   const ultimoSync = c.req.query("ultimo_sync");
 
+  if (!ultimoSync) {
+    return c.json({
+      sync_ts: new Date().toISOString(),
+      beneficiarios: [],
+      actividades: [],
+      cadenas: [],
+      localidades: [],
+      bitacoras: [],
+      asignaciones: { beneficiarios: [], actividades: [] },
+      message: "Primera sincronización - no hay datos locales"
+    });
+  }
+
   const resultado = await obtenerDeltaSync(tecnico.sub, ultimoSync);
 
   if ("error" in resultado) {
-    return c.json({ error: resultado.error }, 400);
+    return c.json({ 
+      error: resultado.error,
+      code: "SYNC_ERROR",
+      message: "Error al obtener cambios para sincronización"
+    }, 400);
   }
 
   return c.json(resultado);

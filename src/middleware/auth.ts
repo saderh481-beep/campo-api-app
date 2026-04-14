@@ -77,10 +77,10 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const authHeader = c.req.header("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-  if (!token) return c.json({ error: "No autenticado" }, 401);
+  if (!token) return c.json({ error: "no_autenticado", message: "No se proporcionó token de autenticación" }, 401);
 
   const payload = await verifyJwt(token);
-  if (!payload) return c.json({ error: "Token inválido o expirado" }, 401);
+  if (!token) return c.json({ error: "token_invalido", message: "Token inválido o expirado" }, 401);
 
   let sessionRaw: string | null = null;
   try {
@@ -100,7 +100,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   }
 
   if (!c.get("tecnico")) {
-    return c.json({ error: "Token inválido o expirado" }, 401);
+    return c.json({ error: "token_invalido", message: "Token inválido o expirado" }, 401);
   }
 
   const tecnico = c.get("tecnico");
@@ -111,11 +111,11 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
     tecnicoActual = await obtenerTecnicoActual(tecnico.sub);
   } catch (error) {
     console.error("[auth] No se pudo validar el usuario en base de datos:", error);
-    return c.json({ error: "Servicio de autenticación no disponible" }, 503);
+    return c.json({ error: "servicio_no_disponible", message: "Error de conexión con la base de datos" }, 503);
   }
 
   if (!tecnicoActual || ("activo" in tecnicoActual && tecnicoActual.activo === false)) {
-    return c.json({ error: "Token inválido o expirado" }, 401);
+    return c.json({ error: "usuario_inactivo", message: "Usuario inactivo o eliminado" }, 401);
   }
 
   const fechaLimiteVencida = tecnicoActual.fecha_limite
@@ -130,7 +130,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
     } catch (error) {
       console.error("[auth] No se pudo invalidar la sesión vencida:", error);
     }
-    return c.json({ error: "periodo_vencido" }, 401);
+    return c.json({ error: "periodo_vencido", message: "Período de trabajo vencido. Contacta a tu coordinador." }, 401);
   }
 
   await next();
