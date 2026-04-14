@@ -38,7 +38,7 @@ const schemaBitacoraBase = z.object({
   observaciones_coordinador: z.string().optional(),
   calificacion: z.number().int().min(1).max(10).optional(),
   reporte: z.string().optional(),
-  datos_extendidos: z.record(z.unknown()).optional(),
+  datos_extendidos: z.any().optional(),
 });
 
 const schemaBitacoraTipoA = schemaBitacoraBase.extend({
@@ -167,7 +167,7 @@ const schemaActualizarBitacora = z.object({
   proposito_coordinacion: z.string().optional(),
   calificacion: z.number().int().min(1).max(10).optional(),
   reporte: z.string().optional(),
-  datos_extendidos: z.record(z.unknown()).optional(),
+  datos_extendidos: z.any().optional(),
 });
 
 app.patch("/:id", zValidator("json", schemaActualizarBitacora), async (c) => {
@@ -537,7 +537,7 @@ const schemaCerrarBitacora = z.object({
   proposito_coordinacion: z.string().optional(),
   calificacion: z.number().int().min(1).max(10).optional(),
   reporte: z.string().optional(),
-  datos_extendidos: z.record(z.unknown()).optional(),
+  datos_extendidos: z.any().optional(),
 });
 
 app.post("/:id/cerrar", zValidator("json", schemaCerrarBitacora), async (c) => {

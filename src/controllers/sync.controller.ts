@@ -32,7 +32,7 @@ const schemaBitacoraTipoA = z.object({
   fotos_campo: z.array(z.string()).optional(),
   calificacion: z.number().optional(),
   reporte: z.string().optional(),
-  datos_extendidos: z.record(z.unknown()).optional(),
+  datos_extendidos: z.any().optional(),
 });
 
 const schemaBitacoraTipoB = z.object({
@@ -53,7 +53,7 @@ const schemaBitacoraTipoB = z.object({
   fotos_campo: z.array(z.string()).optional(),
   calificacion: z.number().optional(),
   reporte: z.string().optional(),
-  datos_extendidos: z.record(z.unknown()).optional(),
+  datos_extendidos: z.any().optional(),
 });
 
 const schemaCrearBitacoraPayload = z.union([schemaBitacoraTipoA, schemaBitacoraTipoB]);
@@ -89,7 +89,7 @@ const schemaEditarBitacoraPayload = z.object({
   fotos_campo: z.array(z.string()).optional(),
   calificacion: z.number().optional(),
   reporte: z.string().optional(),
-  datos_extendidos: z.record(z.unknown()).optional(),
+  datos_extendidos: z.any().optional(),
 });
 
 const schemaCerrarBitacoraPayload = z.object({
@@ -108,7 +108,7 @@ const schemaCerrarBitacoraPayload = z.object({
   fotos_campo: z.array(z.string()).optional(),
   calificacion: z.number().optional(),
   reporte: z.string().optional(),
-  datos_extendidos: z.record(z.unknown()).optional(),
+  datos_extendidos: z.any().optional(),
 });
 
 const schemaOperacion = z.discriminatedUnion("operacion", [
