@@ -1,5 +1,7 @@
 import { sql } from "@/db";
 import type { BitacoraResumen, Beneficiario } from "@/models";
+import { cloudinary } from "@/lib/cloudinary";
+import { requireEnv } from "@/lib/env";
 
 function validarUUID(valor: unknown): boolean {
   if (!valor || typeof valor !== 'string') return false;
@@ -16,6 +18,35 @@ function validarSyncId(valor: unknown): string | null {
     return valor;
   }
   return null;
+}
+
+async function processImageFromDataUri(dataUri: string, folder: string, publicId: string): Promise<string | null> {
+  if (!dataUri || !dataUri.startsWith("data:")) {
+    return dataUri;
+  }
+  
+  try {
+    const base64Match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+    if (!base64Match) {
+      return dataUri;
+    }
+    
+    const mimeType = base64Match[1];
+    const base64Data = base64Match[2];
+    const buffer = Buffer.from(base64Data, "base64");
+    
+    const result = await cloudinary.uploader.upload(`data:${mimeType};base64,${base64Data}`, {
+      upload_preset: requireEnv("CLOUDINARY_PRESET_IMAGENES"),
+      folder,
+      public_id: publicId,
+      resource_type: "image",
+    });
+    
+    return result.secure_url;
+  } catch (err) {
+    console.error("[sync.service] Error procesando imagen:", err);
+    return null;
+  }
 }
 
 export async function sincronizarOperaciones(
@@ -145,11 +176,18 @@ export async function sincronizarOperaciones(
           continue;
         }
 
-const beneficiarioId = validarUUID(p.beneficiario_id) ? p.beneficiario_id : null;
+        const beneficiarioId = validarUUID(p.beneficiario_id) ? p.beneficiario_id : null;
         const cadenaProductivaId = validarUUID(p.cadena_productiva_id) ? p.cadena_productiva_id : null;
         const actividadId = validarUUID(p.actividad_id) ? p.actividad_id : null;
 
-const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+        const firmaUrlValue = p.firma_url 
+          ? await processImageFromDataUri(p.firma_url as string, `campo/firmas/${syncId}`, `firma-${syncId}`)
+          : null;
+        const fotoRostroUrlValue = p.foto_rostro_url
+          ? await processImageFromDataUri(p.foto_rostro_url as string, `campo/rostros/${syncId}`, `rostro-${syncId}`)
+          : null;
+
+        const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           INSERT INTO bitacoras (
             tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id, creada_offline,
             beneficiario_id, cadena_productiva_id, actividad_id,
@@ -172,8 +210,8 @@ const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>
             ${(p.instancia_coordinada as string | null) ?? ''},
             ${(p.proposito_coordinacion as string | null) ?? ''},
             ${(p.observaciones_coordinador as string | null) ?? null},
-            ${(p.foto_rostro_url as string | null) ?? null},
-            ${(p.firma_url as string | null) ?? null},
+            ${fotoRostroUrlValue},
+            ${firmaUrlValue},
             ${(p.calificacion as number | null) ?? null},
             ${(p.reporte as string | null) ?? ''},
             ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null},
@@ -204,7 +242,14 @@ const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
 
-const [actualizada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+        const firmaUrlValue = p.firma_url 
+          ? await processImageFromDataUri(p.firma_url as string, `campo/firmas/${syncId}`, `firma-${syncId}`)
+          : null;
+        const fotoRostroUrlValue = p.foto_rostro_url
+          ? await processImageFromDataUri(p.foto_rostro_url as string, `campo/rostros/${syncId}`, `rostro-${syncId}`)
+          : null;
+
+        const [actualizada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           UPDATE bitacoras SET
             actividades_desc = COALESCE(NULLIF(${p.actividades_desc as string | null}, ''), actividades_desc),
             coord_inicio = COALESCE(${(p.coord_inicio as string | null) ?? null}, coord_inicio),
@@ -217,8 +262,8 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
             instancia_coordinada = COALESCE(NULLIF(${p.instancia_coordinada as string | null}, ''), instancia_coordinada),
             proposito_coordinacion = COALESCE(NULLIF(${p.proposito_coordinacion as string | null}, ''), proposito_coordinacion),
             observaciones_coordinador = COALESCE(${p.observaciones_coordinador as string | null}, observaciones_coordinador),
-            foto_rostro_url = COALESCE(${p.foto_rostro_url as string | null}, foto_rostro_url),
-            firma_url = COALESCE(${p.firma_url as string | null}, firma_url),
+            foto_rostro_url = COALESCE(${fotoRostroUrlValue}, foto_rostro_url),
+            firma_url = COALESCE(${firmaUrlValue}, firma_url),
             calificacion = ${(p.calificacion as number | null) ?? null},
             reporte = COALESCE(NULLIF(${p.reporte as string | null}, ''), reporte),
             datos_extendidos = ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : datos_extendidos},
@@ -260,8 +305,13 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
         const datosExt = (p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null;
         const calif = (p.calificacion as number | null) ?? null;
         const obsCoordTxt = (p.observaciones_coordinador as string | null) ?? '';
-        const fotoRostroTxt = (p.foto_rostro_url as string | null) ?? '';
-        const firmaTxt = (p.firma_url as string | null) ?? '';
+
+        const firmaUrlValue = p.firma_url && (p.firma_url as string).startsWith('data:')
+          ? await processImageFromDataUri(p.firma_url as string, `campo/firmas/${syncId}`, `firma-${syncId}`)
+          : (p.firma_url as string | null);
+        const fotoRostroUrlValue = p.foto_rostro_url && (p.foto_rostro_url as string).startsWith('data:')
+          ? await processImageFromDataUri(p.foto_rostro_url as string, `campo/rostros/${syncId}`, `rostro-${syncId}`)
+          : (p.foto_rostro_url as string | null);
 
         const [cerrada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           UPDATE bitacoras SET
@@ -275,8 +325,8 @@ const [actualizada] = await sql<{ id: string; estado: string; updated_at: string
             instancia_coordinada = CASE WHEN ${instanciaTxt} = '' THEN instancia_coordinada ELSE ${instanciaTxt} END,
             proposito_coordinacion = CASE WHEN ${propositoTxt} = '' THEN proposito_coordinacion ELSE ${propositoTxt} END,
             observaciones_coordinador = CASE WHEN ${obsCoordTxt} = '' THEN observaciones_coordinador ELSE ${obsCoordTxt} END,
-            foto_rostro_url = CASE WHEN ${fotoRostroTxt} = '' THEN foto_rostro_url ELSE ${fotoRostroTxt} END,
-            firma_url = CASE WHEN ${firmaTxt} = '' THEN firma_url ELSE ${firmaTxt} END,
+            foto_rostro_url = CASE WHEN ${fotoRostroUrlValue} IS NULL THEN foto_rostro_url ELSE ${fotoRostroUrlValue} END,
+            firma_url = CASE WHEN ${firmaUrlValue} IS NULL THEN firma_url ELSE ${firmaUrlValue} END,
             calificacion = ${calif},
             reporte = CASE WHEN ${reporteTxt} = '' THEN reporte ELSE ${reporteTxt} END,
             datos_extendidos = ${datosExt},
