@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
+import { validateImageUpload, validateMultipleImages } from "@/middleware/validate-upload";
 import type { JwtPayload } from "@/lib/jwt";
 import {
   crearBitacora,
@@ -194,6 +195,22 @@ app.post("/:id/foto-rostro", async (c) => {
     return c.json({ error: "Foto requerida y debe ser un archivo" }, 400);
   }
 
+  if (!["image/jpeg", "image/png", "image/webp"].includes(archivo.type)) {
+    return c.json({ 
+      error: "Tipo de archivo no permitido", 
+      allowedTypes: ["image/jpeg", "image/png", "image/webp"],
+      receivedType: archivo.type 
+    }, 400);
+  }
+
+  if (archivo.size > 10 * 1024 * 1024) {
+    return c.json({ 
+      error: "Archivo demasiado grande", 
+      maxSizeMB: 10,
+      receivedSizeMB: (archivo.size / (1024 * 1024)).toFixed(2)
+    }, 413);
+  }
+
   const buffer = Buffer.from(await archivo.arrayBuffer());
   const resultado = await subirFotoRostroBitacora(tecnico.sub, id, buffer);
 
@@ -212,6 +229,22 @@ app.post("/:id/firma", async (c) => {
   const archivo = formData.get("firma");
   if (!(archivo instanceof File)) {
     return c.json({ error: "Firma requerida y debe ser un archivo" }, 400);
+  }
+
+  if (!["image/jpeg", "image/png", "image/webp"].includes(archivo.type)) {
+    return c.json({ 
+      error: "Tipo de archivo no permitido", 
+      allowedTypes: ["image/jpeg", "image/png", "image/webp"],
+      receivedType: archivo.type 
+    }, 400);
+  }
+
+  if (archivo.size > 5 * 1024 * 1024) {
+    return c.json({ 
+      error: "Archivo demasiado grande", 
+      maxSizeMB: 5,
+      receivedSizeMB: (archivo.size / (1024 * 1024)).toFixed(2)
+    }, 413);
   }
 
   const buffer = Buffer.from(await archivo.arrayBuffer());
@@ -235,6 +268,30 @@ app.post("/:id/fotos-campo", async (c) => {
   
   if (todosArchivos.length === 0) {
     return c.json({ error: "Se requiere al menos una foto como archivo" }, 400);
+  }
+
+  if (todosArchivos.length > 10) {
+    return c.json({ error: "Máximo 10 fotos por bitácora" }, 400);
+  }
+
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+  const MAX_SIZE = 10 * 1024 * 1024;
+  
+  for (const archivo of todosArchivos) {
+    if (!ALLOWED_TYPES.includes(archivo.type)) {
+      return c.json({ 
+        error: "Tipo de archivo no permitido", 
+        allowedTypes: ALLOWED_TYPES,
+        receivedType: archivo.type 
+      }, 400);
+    }
+    if (archivo.size > MAX_SIZE) {
+      return c.json({ 
+        error: "Archivo demasiado grande", 
+        maxSizeMB: 10,
+        receivedSizeMB: (archivo.size / (1024 * 1024)).toFixed(2)
+      }, 413);
+    }
   }
 
   const buffers: Buffer[] = [];

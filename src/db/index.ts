@@ -7,9 +7,10 @@ export function getSqlClient() {
   if (!sqlClient) {
     const databaseUrl = requireEnv("DATABASE_URL");
     sqlClient = postgres(databaseUrl, {
-      max: 10,
+      max: 20,
       idle_timeout: 20,
       connect_timeout: 10,
+      max_lifetime: 60 * 30,
       prepare: false,
     });
   }

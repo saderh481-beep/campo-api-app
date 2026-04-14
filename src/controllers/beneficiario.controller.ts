@@ -6,6 +6,8 @@ import type { JwtPayload } from "@/lib/jwt";
 import {
   obtenerAsignacionesTecnicoParaApp,
   obtenerBeneficiariosTecnicoParaApp,
+  obtenerBeneficiariosTecnicoPaginado,
+  obtenerBeneficiarioPorId,
   crearBeneficiario,
   obtenerActividadesTecnico,
   obtenerCadenasProductivas,
@@ -38,6 +40,49 @@ app.get("/asignaciones", async (c) => {
 
 app.get("/mis-beneficiarios", async (c) => {
   const tecnico = c.get("tecnico");
+  const limit = parseInt(c.req.query("limit") || "50");
+  const offset = parseInt(c.req.query("offset") || "0");
+  const buscar = c.req.query("buscar") || undefined;
+  
+  if (limit > 0 || offset > 0 || buscar) {
+    const result = await obtenerBeneficiariosTecnicoPaginado(tecnico.sub, { limit, offset, buscar });
+    return c.json(result);
+  }
+  
+  const beneficiarios = await obtenerBeneficiariosTecnicoParaApp(tecnico.sub);
+  return c.json(beneficiarios);
+});
+
+app.get("/beneficiarios/:id", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { id } = c.req.param();
+  
+  const beneficiario = await obtenerBeneficiarioPorId(tecnico.sub, id);
+  
+  if (!beneficiario) {
+    return c.json({ error: "Beneficiario no encontrado" }, 404);
+  }
+  
+  return c.json(beneficiario);
+});
+
+app.get("/asignaciones", async (c) => {
+  const tecnico = c.get("tecnico");
+  const asignaciones = await obtenerAsignacionesTecnicoParaApp(tecnico.sub);
+  return c.json(asignaciones);
+});
+
+app.get("/mis-beneficiarios", async (c) => {
+  const tecnico = c.get("tecnico");
+  const limit = parseInt(c.req.query("limit") || "50");
+  const offset = parseInt(c.req.query("offset") || "0");
+  const buscar = c.req.query("buscar") || undefined;
+  
+  if (limit > 0 || offset > 0 || buscar) {
+    const result = await obtenerBeneficiariosTecnicoPaginado(tecnico.sub, { limit, offset, buscar });
+    return c.json(result);
+  }
+  
   const beneficiarios = await obtenerBeneficiariosTecnicoParaApp(tecnico.sub);
   return c.json(beneficiarios);
 });

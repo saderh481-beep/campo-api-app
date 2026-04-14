@@ -202,18 +202,155 @@ export async function obtenerBeneficiariosTecnicoParaApp(tecnicoId: string) {
     nombre_completo: beneficiario.nombre,
     municipio: beneficiario.municipio,
     localidad: beneficiario.localidad,
-    curp: null,
-    folio_saderh: null,
+    direccion: beneficiario.direccion,
+    cp: beneficiario.cp,
+    coord_parcela: beneficiario.coord_parcela,
+    curp: beneficiario.curp,
+    folio_saderh: beneficiario.folio_saderh,
     cadena_productiva: cadenaPrincipal(beneficiario),
-    telefono_contacto: beneficiario.telefono_principal,
+    telefono_principal: beneficiario.telefono_principal,
+    telefono_secundario: beneficiario.telefono_secundario,
     activo: beneficiario.activo,
   }));
 
   return {
     success: true,
     id_tecnico: tecnicoId,
-    beneficiarios: items,
+    beneficiaries: items,
     total: items.length,
+  };
+}
+
+export async function obtenerBeneficiariosTecnicoPaginado(
+  tecnicoId: string,
+  options: { limit?: number; offset?: number; buscar?: string } = {}
+) {
+  const { limit = 50, offset = 0, buscar } = options;
+
+  let countQuery = `
+    SELECT COUNT(*)::int as total
+    FROM asignaciones_beneficiario ab
+    JOIN beneficiarios b ON b.id = ab.beneficiario_id
+    WHERE ab.tecnico_id = $1 AND ab.activo = true AND b.activo = true
+  `;
+  
+  let dataQuery = `
+    SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
+           b.telefono_principal, b.telefono_secundario,
+           b.curp, b.folio_saderh,
+           CASE
+             WHEN b.coord_parcela IS NULL THEN NULL
+             ELSE CONCAT('(', b.coord_parcela[0], ',', b.coord_parcela[1], ')')
+           END AS coord_parcela,
+           b.activo,
+           COALESCE((
+             SELECT json_agg(json_build_object('id', cp.id, 'nombre', cp.nombre) ORDER BY cp.nombre)
+             FROM beneficiario_cadenas bc
+             JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
+             WHERE bc.beneficiario_id = b.id
+               AND bc.activo = true
+               AND cp.activo = true
+           ), '[]'::json) AS cadenas
+    FROM asignaciones_beneficiario ab
+    JOIN beneficiarios b ON b.id = ab.beneficiario_id
+    WHERE ab.tecnico_id = $1 AND ab.activo = true AND b.activo = true
+  `;
+
+  const params: any[] = [tecnicoId];
+  let paramIndex = 2;
+
+  if (buscar && buscar.trim().length > 0) {
+    const searchTerm = `%${buscar.trim().toLowerCase()}%`;
+    countQuery += ` AND (LOWER(b.nombre) LIKE $${paramIndex} OR LOWER(b.municipio) LIKE $${paramIndex} OR LOWER(b.localidad) LIKE $${paramIndex})`;
+    dataQuery += ` AND (LOWER(b.nombre) LIKE $${paramIndex} OR LOWER(b.municipio) LIKE $${paramIndex} OR LOWER(b.localidad) LIKE $${paramIndex})`;
+    params.push(searchTerm);
+    paramIndex++;
+  }
+
+  const [countResult] = await sql.unsafe(countQuery, params);
+  const total = countResult?.total || 0;
+
+  dataQuery += ` ORDER BY b.id, b.nombre LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+  params.push(limit, offset);
+
+  const beneficiaries = await sql.unsafe(dataQuery, params);
+
+  const items = beneficiaries.map((beneficiario: any) => ({
+    id: beneficiario.id,
+    id_tecnico: tecnicoId,
+    id_beneficiario: beneficiario.id,
+    nombre: beneficiario.nombre,
+    nombre_completo: beneficiario.nombre,
+    municipio: beneficiario.municipio,
+    localidad: beneficiario.localidad,
+    direccion: beneficiario.direccion,
+    cp: beneficiario.cp,
+    coord_parcela: beneficiario.coord_parcela,
+    curp: beneficiario.curp,
+    folio_saderh: beneficiario.folio_saderh,
+    cadena_productiva: cadenaPrincipal(beneficiario),
+    telefono_principal: beneficiario.telefono_principal,
+    telefono_secundario: beneficiario.telefono_secundario,
+    activo: beneficiario.activo,
+  }));
+
+  return {
+    success: true,
+    id_tecnico: tecnicoId,
+    beneficiaries: items,
+    total,
+    limit,
+    offset,
+    hasMore: offset + items.length < total,
+  };
+}
+
+export async function obtenerBeneficiarioPorId(tecnicoId: string, beneficiarioId: string) {
+  const [beneficiario] = await sql<BeneficiarioConCadenas[]>`
+    SELECT b.id, b.nombre, b.curp, b.folio_saderh, b.municipio, b.localidad, b.direccion, b.cp,
+           b.telefono_principal, b.telefono_secundario,
+           CASE
+             WHEN b.coord_parcela IS NULL THEN NULL
+             ELSE CONCAT('(', b.coord_parcela[0], ',', b.coord_parcela[1], ')')
+           END AS coord_parcela,
+           b.activo,
+           COALESCE((
+             SELECT json_agg(json_build_object('id', cp.id, 'nombre', cp.nombre) ORDER BY cp.nombre)
+             FROM beneficiario_cadenas bc
+             JOIN cadenas_productivas cp ON cp.id = bc.cadena_id
+             WHERE bc.beneficiario_id = b.id
+               AND bc.activo = true
+               AND cp.activo = true
+           ), '[]'::json) AS cadenas
+    FROM beneficiarios b
+    JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
+    WHERE b.id = ${beneficiarioId}
+      AND ab.tecnico_id = ${tecnicoId}
+      AND ab.activo = true
+      AND b.activo = true
+    LIMIT 1
+  `;
+
+  if (!beneficiario) return null;
+
+  return {
+    id: beneficiario.id,
+    id_tecnico: tecnicoId,
+    id_beneficiario: beneficiario.id,
+    nombre: beneficiario.nombre,
+    nombre_completo: beneficiario.nombre,
+    municipio: beneficiario.municipio,
+    localidad: beneficiario.localidad,
+    direccion: beneficiario.direccion,
+    cp: beneficiario.cp,
+    coord_parcela: beneficiario.coord_parcela,
+    curp: beneficiario.curp,
+    folio_saderh: beneficiario.folio_saderh,
+    cadena_productiva: cadenaPrincipal(beneficiario),
+    telefono_principal: beneficiario.telefono_principal,
+    telefono_secundario: beneficiario.telefono_secundario,
+    activo: beneficiario.activo,
+    cadenas: beneficiario.cadenas,
   };
 }
 

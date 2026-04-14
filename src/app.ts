@@ -4,6 +4,8 @@ import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { env } from "@/config/env";
+import { globalRateLimit } from "@/middleware/ratelimit";
+import { errorHandler } from "@/lib/error-handler";
 
 import {
   authController,
@@ -15,8 +17,10 @@ import {
 
 const app = new Hono();
 
+app.use("*", errorHandler);
 app.use("*", logger());
 app.use("*", secureHeaders());
+app.use("*", globalRateLimit());
 app.use(
   "*",
   cors({
@@ -32,9 +36,58 @@ app.use(
   })
 );
 
-app.get("/health", (c) =>
-  c.text("OK", 200)
-);
+app.get("/health", async (c) => {
+  const health: {
+    status: string;
+    timestamp: string;
+    services: {
+      database: { status: string; latencyMs?: number; error?: string };
+      redis: { status: string; latencyMs?: number; error?: string };
+    };
+  } = {
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    services: {
+      database: { status: "unknown" },
+      redis: { status: "unknown" },
+    },
+  };
+
+  const startDb = Date.now();
+  try {
+    const { sql } = await import("@/db");
+    await sql`SELECT 1`;
+    health.services.database = {
+      status: "ok",
+      latencyMs: Date.now() - startDb,
+    };
+  } catch (error) {
+    health.services.database = {
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+    health.status = "degraded";
+  }
+
+  const startRedis = Date.now();
+  try {
+    const { redis } = await import("@/lib/redis");
+    await redis.get("healthcheck");
+    health.services.redis = {
+      status: "ok",
+      latencyMs: Date.now() - startRedis,
+    };
+  } catch (error) {
+    health.services.redis = {
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+    health.status = "degraded";
+  }
+
+  const httpStatus = health.status === "ok" ? 200 : 503;
+  return c.json(health, httpStatus);
+});
 
 app.get("/version", (c) =>
   c.json({ version: "1.0.0", deployedAt: new Date().toISOString() })
@@ -167,18 +220,25 @@ app.post("/test-upload-probe", async (c) => {
 });
 
 // Rutas de autenticación
-app.route("/auth", authController);
+app.route("/api/v1/auth", authController);
 
 // Rutas de datos (beneficiarios, actividades, cadenas, localidades)
-app.route("/", beneficiarioController);
+app.route("/api/v1", beneficiarioController);
 
 // Rutas de bitácoras
-app.route("/bitacoras", bitacoraController);
+app.route("/api/v1/bitacoras", bitacoraController);
 
 // Rutas de sincronización
-app.route("/", syncController);
+app.route("/api/v1", syncController);
 
 // Rutas de notificaciones
+app.route("/api/v1/notificaciones", notificacionController);
+
+// Rutas legacy (sin versionar - mantener temporalmente)
+app.route("/auth", authController);
+app.route("/", beneficiarioController);
+app.route("/bitacoras", bitacoraController);
+app.route("/", syncController);
 app.route("/notificaciones", notificacionController);
 
 app.notFound((c) => c.json({ error: "Ruta no encontrada" }, 404));

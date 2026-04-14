@@ -92,75 +92,50 @@ export async function obtenerBitacorasTecnico(
   console.log("[obtenerBitacorasTecnico] tecnicoId:", tecnicoId, "estado:", estado, "limit:", limit, "offset:", offset);
 
   let bitacoras;
+  
+  const baseQuery = estado
+    ? `SELECT b.*, 
+        ben.nombre as beneficiario_nombre, 
+        act.nombre as actividad_nombre
+      FROM bitacoras b
+      LEFT JOIN beneficiaries ben ON b.beneficiario_id = ben.id
+      LEFT JOIN actividades act ON b.actividad_id = act.id
+      WHERE b.tecnico_id = $1 AND b.estado = $2
+      ORDER BY b.fecha_inicio DESC
+      LIMIT $3 OFFSET $4`
+    : `SELECT b.*, 
+        ben.nombre as beneficiario_nombre, 
+        act.nombre as actividad_nombre
+      FROM bitacoras b
+      LEFT JOIN beneficiaries ben ON b.beneficiario_id = ben.id
+      LEFT JOIN actividades act ON b.actividad_id = act.id
+      WHERE b.tecnico_id = $1
+      ORDER BY b.fecha_inicio DESC
+      LIMIT $2 OFFSET $3`;
+
   if (estado) {
-    bitacoras = await sql<Bitacora[]>`
-      SELECT *
-      FROM bitacoras
-      WHERE tecnico_id = ${tecnicoId}
-        AND estado = ${estado}
-      ORDER BY fecha_inicio DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    bitacoras = await sql.unsafe(baseQuery, [tecnicoId, estado, limit, offset]);
   } else {
-    bitacoras = await sql<Bitacora[]>`
-      SELECT *
-      FROM bitacoras
-      WHERE tecnico_id = ${tecnicoId}
-      ORDER BY fecha_inicio DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    bitacoras = await sql.unsafe(baseQuery, [tecnicoId, limit, offset]);
   }
 
   console.log("[obtenerBitacorasTecnico] Query ejecutada, bitacoras.length:", bitacoras?.length ?? 0);
 
-  if (!bitacoras || bitacoras.length === 0) return [];
-
-  const enriched = await Promise.all(
-    bitacoras.map(async (b) => {
-      if (b.beneficiario_id) {
-        const [beneficiario] = await sql<{ nombre: string }[]>`
-          SELECT nombre FROM beneficiarios WHERE id = ${b.beneficiario_id}
-        `;
-        if (beneficiario) return { ...b, beneficiario_nombre: beneficiario.nombre };
-      }
-      if (b.actividad_id) {
-        const [actividad] = await sql<{ nombre: string }[]>`
-          SELECT nombre FROM actividades WHERE id = ${b.actividad_id}
-        `;
-        if (actividad) return { ...b, actividad_nombre: actividad.nombre };
-      }
-      return b;
-    })
-  );
-
-  return enriched;
+  return bitacoras || [];
 }
 
 export async function obtenerBitacoraPorId(tecnicoId: string, bitacoraId: string) {
-  const [bitacora] = await sql<Bitacora[]>`
-    SELECT * FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
-  `;
-  if (!bitacora) return null;
-
-  if (bitacora.beneficiario_id) {
-    const [beneficiario] = await sql<{ id: string; nombre: string }[]>`
-      SELECT id, nombre FROM beneficiarios WHERE id = ${bitacora.beneficiario_id}
-    `;
-    if (beneficiario) {
-      return { ...bitacora, beneficiario_nombre: beneficiario.nombre };
-    }
-  }
-
-  if (bitacora.actividad_id) {
-    const [actividad] = await sql<{ id: string; nombre: string }[]>`
-      SELECT id, nombre FROM actividades WHERE id = ${bitacora.actividad_id}
-    `;
-    if (actividad) {
-      return { ...bitacora, actividad_nombre: actividad.nombre };
-    }
-  }
-
-  return bitacora;
+  const [bitacora] = await sql.unsafe(`
+    SELECT b.*, 
+      ben.nombre as beneficiario_nombre, 
+      act.nombre as actividad_nombre
+    FROM bitacoras b
+    LEFT JOIN beneficiaries ben ON b.beneficiario_id = ben.id
+    LEFT JOIN actividades act ON b.actividad_id = act.id
+    WHERE b.id = $1 AND b.tecnico_id = $2
+  `, [bitacoraId, tecnicoId]);
+  
+  return bitacora || null;
 }
 
 export async function actualizarBitacora(

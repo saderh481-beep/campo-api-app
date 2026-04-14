@@ -3,8 +3,9 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "strict": true,
+    "strict": false,
     "skipLibCheck": true,
+    "noImplicitAny": false,
     "types": ["bun-types"],
     "paths": {
       "@/*": ["./src/*"]

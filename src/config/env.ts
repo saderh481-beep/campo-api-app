@@ -27,7 +27,19 @@ const envSchema = z
     CLOUDINARY_PRESET_DOCS: z.string().optional(),
     CORS_ORIGIN: z.string().optional(),
     WEB_ORIGIN: z.string().optional(),
-  });
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    RATE_LIMIT_WINDOW_SECS: z.coerce.number().int().positive().default(60),
+    MAX_UPLOAD_SIZE_MB: z.coerce.number().int().positive().default(10),
+  })
+  .refine(
+    (data) => {
+      if (data.NODE_ENV === "production" && !data.JWT_SECRET) {
+        return false;
+      }
+      return true;
+    },
+    { message: "JWT_SECRET es obligatorio en producción" }
+  );
 
 const normalizedEnv = Object.fromEntries(
   Object.entries(process.env).map(([key, value]) => [key, sanitizeEnvValue(value)])
@@ -59,8 +71,11 @@ export function requireEnv(name: keyof typeof env, options?: { minLength?: numbe
     throw new Error(`[api-app] ${name} no configurado`);
   }
 
-  if (options?.minLength && value.length < options.minLength) {
-    throw new Error(`[api-app] ${name} debe tener al menos ${options.minLength} caracteres`);
+  if (name === "JWT_SECRET" && options?.minLength && value.length < options.minLength) {
+    if (env.NODE_ENV === "production") {
+      throw new Error(`[api-app] ${name} debe tener al menos ${options.minLength} caracteres en producción`);
+    }
+    console.warn(`[api-app] ADVERTENCIA: ${name} es corto (${value.length} chars). En producción use al menos ${options.minLength} caracteres.`);
   }
 
   return value;
