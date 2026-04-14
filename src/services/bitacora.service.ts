@@ -34,13 +34,17 @@ export async function crearBitacora(
 ) {
   // Verificar si ya existe por sync_id
   if (data.sync_id) {
-    const [existente] = await sql<BitacoraResumen[]>`
-      SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
-      FROM bitacoras
-      WHERE sync_id = ${data.sync_id}
-    `;
-    if (existente) {
-      return { duplicado: true, ...existente };
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const offlineRegex = /^offline-\d+-[a-z0-9]+$/i;
+    if (uuidRegex.test(data.sync_id) || offlineRegex.test(data.sync_id)) {
+      const [existente] = await sql<BitacoraResumen[]>`
+        SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
+        FROM bitacoras
+        WHERE sync_id = ${data.sync_id}
+      `;
+      if (existente) {
+        return { duplicado: true, ...existente };
+      }
     }
   }
 

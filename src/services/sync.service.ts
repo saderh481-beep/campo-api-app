@@ -10,7 +10,12 @@ function validarUUID(valor: unknown): boolean {
 function validarSyncId(valor: unknown): string | null {
   if (!valor || typeof valor !== 'string') return null;
   if (valor.length === 0 || valor.length > 200) return null;
-  return valor;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const offlineRegex = /^offline-\d+-[a-z0-9]+$/i;
+  if (uuidRegex.test(valor) || offlineRegex.test(valor)) {
+    return valor;
+  }
+  return null;
 }
 
 export async function sincronizarOperaciones(
