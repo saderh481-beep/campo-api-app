@@ -48,10 +48,11 @@ export async function sincronizarOperaciones(
       if (op.operacion === "crear_beneficiario") {
         const p = op.payload;
 
-        if (!p.sync_id) throw new Error("sync_id requerido");
+        const syncId = validarSyncId(p.sync_id);
+        if (!syncId) throw new Error("sync_id requerido");
         
         const [existente] = await sql<{ id: string }[]>`
-          SELECT id FROM beneficiarios WHERE sync_id = ${String(p.sync_id)} AND tecnico_id = ${tecnicoId}
+          SELECT id FROM beneficiarios WHERE sync_id = ${syncId} AND tecnico_id = ${tecnicoId}
         `;
         if (existente) {
           resultados.push({
@@ -76,7 +77,7 @@ export async function sincronizarOperaciones(
             ${String(p.localidad)},
             ${String(p.telefono ?? "")},
             ${tecnicoId},
-            ${String(p.sync_id)},
+            ${syncId},
             ${(p.telefono_secundario as string | null) ?? null},
             ${(p.direccion as string | null) ?? null},
             ${(p.cp as string | null) ?? null},
