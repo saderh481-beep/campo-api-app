@@ -238,30 +238,49 @@ export async function sincronizarOperaciones(
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : null;
 
-        const [actualizada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+        const [actualizada] = await sql.unsafe(`
           UPDATE bitacoras SET
-            actividades_desc = COALESCE(NULLIF(${p.actividades_desc as string | null}, ''), actividades_desc),
-            coord_inicio = COALESCE(${(p.coord_inicio as string | null) ?? null}, coord_inicio),
-            coord_fin = COALESCE(${(p.coord_fin as string | null) ?? null}, coord_fin),
-            fecha_inicio = COALESCE(${(p.fecha_inicio as string | null) ?? null}, fecha_inicio),
-            fecha_fin = COALESCE(${(p.fecha_fin as string | null) ?? null}, fecha_fin),
-            recomendaciones = COALESCE(NULLIF(${p.recomendaciones as string | null}, ''), recomendaciones),
-            comentarios_beneficiario = COALESCE(NULLIF(${p.comentarios_beneficiario as string | null}, ''), comentarios_beneficiario),
-            coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? false},
-            instancia_coordinada = COALESCE(NULLIF(${p.instancia_coordinada as string | null}, ''), instancia_coordinada),
-            proposito_coordinacion = COALESCE(NULLIF(${p.proposito_coordinacion as string | null}, ''), proposito_coordinacion),
-            observaciones_coordinador = COALESCE(${p.observaciones_coordinador as string | null}, observaciones_coordinador),
-            foto_rostro_url = COALESCE(${fotoRostroUrlValue}, foto_rostro_url),
-            firma_url = COALESCE(${firmaUrlValue}, firma_url),
-            calificacion = ${(p.calificacion as number | null) ?? null},
-            reporte = COALESCE(NULLIF(${p.reporte as string | null}, ''), reporte),
-            datos_extendidos = ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null},
-            fotos_campo = COALESCE(${p.fotos_campo ? JSON.stringify(p.fotos_campo) : null}, fotos_campo),
+            actividades_desc = COALESCE(NULLIF($1, ''), actividades_desc),
+            coord_inicio = COALESCE($2, coord_inicio),
+            coord_fin = COALESCE($3, coord_fin),
+            fecha_inicio = COALESCE($4, fecha_inicio),
+            fecha_fin = COALESCE($5, fecha_fin),
+            recomendaciones = COALESCE(NULLIF($6, ''), recomendaciones),
+            comentarios_beneficiario = COALESCE(NULLIF($7, ''), comentarios_beneficiario),
+            coordinacion_interinst = $8,
+            instancia_coordinada = COALESCE(NULLIF($9, ''), instancia_coordinada),
+            proposito_coordinacion = COALESCE(NULLIF($10, ''), proposito_coordinacion),
+            observaciones_coordinador = $11,
+            foto_rostro_url = COALESCE($12, foto_rostro_url),
+            firma_url = COALESCE($13, firma_url),
+            calificacion = $14,
+            reporte = COALESCE(NULLIF($15, ''), reporte),
+            datos_extendidos = $16,
+            fotos_campo = COALESCE($17, fotos_campo),
             updated_at = NOW()
-          WHERE sync_id = ${syncId}
-            AND tecnico_id = ${tecnicoId}
+          WHERE sync_id = $18 AND tecnico_id = $19
           RETURNING id, estado, updated_at
-        `;
+        `, [
+          p.actividades_desc as string | null,
+          p.coord_inicio as string | null,
+          p.coord_fin as string | null,
+          p.fecha_inicio as string | null,
+          p.fecha_fin as string | null,
+          p.recomendaciones as string | null,
+          p.comentarios_beneficiario as string | null,
+          (p.coordinacion_interinst as boolean | null) ?? false,
+          p.instancia_coordinada as string | null,
+          p.proposito_coordinacion as string | null,
+          p.observaciones_coordinador as string | null,
+          fotoRostroUrlValue,
+          firmaUrlValue,
+          (p.calificacion as number | null) ?? null,
+          p.reporte as string | null,
+          p.datos_extendidos ? JSON.stringify(p.datos_extendidos) : null,
+          p.fotos_campo ? JSON.stringify(p.fotos_campo) : null,
+          syncId,
+          tecnicoId
+        ]);
         resultados.push({
           sync_id: String(p.sync_id),
           id: actualizada.id,
@@ -302,28 +321,44 @@ export async function sincronizarOperaciones(
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : (p.foto_rostro_url as string | null);
 
-        const [cerrada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
+        const [cerrada] = await sql.unsafe(`
           UPDATE bitacoras SET
             estado = 'cerrada',
-            fecha_fin = ${String(p.fecha_fin)},
-            coord_fin = ${(p.coord_fin as string | null) ?? null},
-            actividades_desc = CASE WHEN ${actividadDesc} = '' THEN actividades_desc ELSE ${actividadDesc} END,
-            recomendaciones = CASE WHEN ${recomendacionesTxt} = '' THEN recomendaciones ELSE ${recomendacionesTxt} END,
-            comentarios_beneficiario = CASE WHEN ${comentariosTxt} = '' THEN comentarios_beneficiario ELSE ${comentariosTxt} END,
-            coordinacion_interinst = ${(p.coordinacion_interinst as boolean | null) ?? false},
-            instancia_coordinada = CASE WHEN ${instanciaTxt} = '' THEN instancia_coordinada ELSE ${instanciaTxt} END,
-            proposito_coordinacion = CASE WHEN ${propositoTxt} = '' THEN proposito_coordinacion ELSE ${propositoTxt} END,
-            observaciones_coordinador = CASE WHEN ${obsCoordTxt} = '' THEN observaciones_coordinador ELSE ${obsCoordTxt} END,
-            foto_rostro_url = CASE WHEN ${fotoRostroUrlValue} IS NULL THEN foto_rostro_url ELSE ${fotoRostroUrlValue} END,
-            firma_url = CASE WHEN ${firmaUrlValue} IS NULL THEN firma_url ELSE ${firmaUrlValue} END,
-            calificacion = ${calif},
-            reporte = CASE WHEN ${reporteTxt} = '' THEN reporte ELSE ${reporteTxt} END,
-            datos_extendidos = ${datosExt},
+            fecha_fin = $1,
+            coord_fin = $2,
+            actividades_desc = CASE WHEN $3 = '' THEN actividades_desc ELSE $3 END,
+            recomendaciones = CASE WHEN $4 = '' THEN recomendaciones ELSE $4 END,
+            comentarios_beneficiario = CASE WHEN $5 = '' THEN comentarios_beneficiario ELSE $5 END,
+            coordinacion_interinst = $6,
+            instancia_coordinada = CASE WHEN $7 = '' THEN instancia_coordinada ELSE $7 END,
+            proposito_coordinacion = CASE WHEN $8 = '' THEN proposito_coordinacion ELSE $8 END,
+            observaciones_coordinador = CASE WHEN $9 = '' THEN observaciones_coordinador ELSE $9 END,
+            foto_rostro_url = CASE WHEN $10 IS NULL THEN foto_rostro_url ELSE $10 END,
+            firma_url = CASE WHEN $11 IS NULL THEN firma_url ELSE $11 END,
+            calificacion = $12,
+            reporte = CASE WHEN $13 = '' THEN reporte ELSE $13 END,
+            datos_extendidos = $14,
             updated_at = NOW()
-          WHERE sync_id = ${syncId}
-            AND tecnico_id = ${tecnicoId}
+          WHERE sync_id = $15 AND tecnico_id = $16
           RETURNING id, estado, updated_at
-        `;
+        `, [
+          String(p.fecha_fin),
+          p.coord_fin as string | null,
+          actividadDesc,
+          recomendacionesTxt,
+          comentariosTxt,
+          (p.coordinacion_interinst as boolean | null) ?? false,
+          instanciaTxt,
+          propositoTxt,
+          obsCoordTxt,
+          fotoRostroUrlValue,
+          firmaUrlValue,
+          calif,
+          reporteTxt,
+          datosExt,
+          syncId,
+          tecnicoId
+        ]);
         resultados.push({
           sync_id: String(p.sync_id),
           id: cerrada.id,
