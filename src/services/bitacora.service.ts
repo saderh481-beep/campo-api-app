@@ -43,11 +43,11 @@ export async function crearBitacora(
   })() : null;
 
   if (syncId) {
-    const [existente] = await sql<BitacoraResumen[]>`
+    const [existente] = await sql.unsafe(`
       SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
       FROM bitacoras
-      WHERE sync_id = ${syncId}
-    `;
+      WHERE sync_id = $1
+    `, [syncId]);
     if (existente) {
       return { duplicado: true, ...existente };
     }

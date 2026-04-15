@@ -72,9 +72,9 @@ export async function sincronizarOperaciones(
         const syncId = validarSyncId(p.sync_id);
         if (!syncId) throw new Error("sync_id requerido");
         
-        const [existente] = await sql<{ id: string }[]>`
-          SELECT id FROM beneficiarios WHERE sync_id = ${syncId} AND tecnico_id = ${tecnicoId}
-        `;
+        const [existente] = await sql.unsafe(`
+          SELECT id FROM beneficiarios WHERE sync_id = $1 AND tecnico_id = $2
+        `, [syncId, tecnicoId]);
         if (existente) {
           resultados.push({
             sync_id: String(p.sync_id),
@@ -146,12 +146,11 @@ export async function sincronizarOperaciones(
         const syncId = validarSyncId(p.sync_id);
         if (!syncId) throw new Error("sync_id requerido");
 
-        const [existente] = await sql<BitacoraResumen[]>`
+        const [existente] = await sql.unsafe(`
           SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
           FROM bitacoras
-          WHERE sync_id = ${syncId}
-            AND tecnico_id = ${tecnicoId}
-        `;
+          WHERE sync_id = $1 AND tecnico_id = $2
+        `, [syncId, tecnicoId]);
         if (existente) {
           resultados.push({
             sync_id: String(p.sync_id),
@@ -226,9 +225,9 @@ export async function sincronizarOperaciones(
         const syncId = validarSyncId(p.sync_id);
         if (!syncId) throw new Error("sync_id requerido");
 
-        const [bitacora] = await sql<BitacoraResumen[]>`
-          SELECT id, estado FROM bitacoras WHERE sync_id = ${syncId} AND tecnico_id = ${tecnicoId}
-        `;
+        const [bitacora] = await sql.unsafe(`
+          SELECT id, estado FROM bitacoras WHERE sync_id = $1 AND tecnico_id = $2
+        `, [syncId, tecnicoId]);
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
 
@@ -280,9 +279,9 @@ export async function sincronizarOperaciones(
         const syncId = validarSyncId(p.sync_id);
         if (!syncId) throw new Error("sync_id requerido");
 
-        const [bitacora] = await sql<BitacoraResumen[]>`
-          SELECT id, estado FROM bitacoras WHERE sync_id = ${syncId} AND tecnico_id = ${tecnicoId}
-        `;
+        const [bitacora] = await sql.unsafe(`
+          SELECT id, estado FROM bitacoras WHERE sync_id = $1 AND tecnico_id = $2
+        `, [syncId, tecnicoId]);
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("La bitácora ya está cerrada");
 
