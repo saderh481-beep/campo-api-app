@@ -1,7 +1,6 @@
 import { sql } from "@/db";
 import type { BitacoraResumen, Beneficiario } from "@/models";
-import { cloudinary } from "@/lib/cloudinary";
-import { requireEnv } from "@/lib/env";
+import { uploadFirmaFromBase64, uploadFotoRostroFromBase64 } from "@/lib/files-api";
 
 function validarUUID(valor: unknown): boolean {
   if (!valor || typeof valor !== 'string') return false;
@@ -20,29 +19,19 @@ function validarSyncId(valor: unknown): string | null {
   return null;
 }
 
-async function processImageFromDataUri(dataUri: string, folder: string, publicId: string): Promise<string | null> {
+async function processImageFromDataUri(dataUri: string, type: 'firma' | 'rostro', bitacoraId: string): Promise<string | null> {
   if (!dataUri || !dataUri.startsWith("data:")) {
     return dataUri;
   }
   
   try {
-    const base64Match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
-    if (!base64Match) {
-      return dataUri;
+    if (type === 'firma') {
+      const result = await uploadFirmaFromBase64(bitacoraId, dataUri);
+      return result.success ? result.url ?? null : null;
+    } else {
+      const result = await uploadFotoRostroFromBase64(bitacoraId, dataUri);
+      return result.success ? result.url ?? null : null;
     }
-    
-    const mimeType = base64Match[1];
-    const base64Data = base64Match[2];
-    const buffer = Buffer.from(base64Data, "base64");
-    
-    const result = await cloudinary.uploader.upload(`data:${mimeType};base64,${base64Data}`, {
-      upload_preset: requireEnv("CLOUDINARY_PRESET_IMAGENES"),
-      folder,
-      public_id: publicId,
-      resource_type: "image",
-    });
-    
-    return result.secure_url;
   } catch (err) {
     console.error("[sync.service] Error procesando imagen:", err);
     return null;
@@ -181,10 +170,10 @@ export async function sincronizarOperaciones(
         const actividadId = validarUUID(p.actividad_id) ? p.actividad_id : null;
 
         const firmaUrlValue = p.firma_url 
-          ? await processImageFromDataUri(p.firma_url as string, `campo/firmas/${syncId}`, `firma-${syncId}`)
+          ? await processImageFromDataUri(p.firma_url as string, 'firma', syncId)
           : null;
         const fotoRostroUrlValue = p.foto_rostro_url
-          ? await processImageFromDataUri(p.foto_rostro_url as string, `campo/rostros/${syncId}`, `rostro-${syncId}`)
+          ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : null;
 
         const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
@@ -243,10 +232,10 @@ export async function sincronizarOperaciones(
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
 
         const firmaUrlValue = p.firma_url 
-          ? await processImageFromDataUri(p.firma_url as string, `campo/firmas/${syncId}`, `firma-${syncId}`)
+          ? await processImageFromDataUri(p.firma_url as string, 'firma', syncId)
           : null;
         const fotoRostroUrlValue = p.foto_rostro_url
-          ? await processImageFromDataUri(p.foto_rostro_url as string, `campo/rostros/${syncId}`, `rostro-${syncId}`)
+          ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : null;
 
         const [actualizada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
@@ -266,7 +255,7 @@ export async function sincronizarOperaciones(
             firma_url = COALESCE(${firmaUrlValue}, firma_url),
             calificacion = ${(p.calificacion as number | null) ?? null},
             reporte = COALESCE(NULLIF(${p.reporte as string | null}, ''), reporte),
-            datos_extendidos = ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : datos_extendidos},
+            datos_extendidos = ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null},
             fotos_campo = COALESCE(${p.fotos_campo ? JSON.stringify(p.fotos_campo) : null}, fotos_campo),
             updated_at = NOW()
           WHERE sync_id = ${syncId}
@@ -307,10 +296,10 @@ export async function sincronizarOperaciones(
         const obsCoordTxt = (p.observaciones_coordinador as string | null) ?? '';
 
         const firmaUrlValue = p.firma_url && (p.firma_url as string).startsWith('data:')
-          ? await processImageFromDataUri(p.firma_url as string, `campo/firmas/${syncId}`, `firma-${syncId}`)
+          ? await processImageFromDataUri(p.firma_url as string, 'firma', syncId)
           : (p.firma_url as string | null);
         const fotoRostroUrlValue = p.foto_rostro_url && (p.foto_rostro_url as string).startsWith('data:')
-          ? await processImageFromDataUri(p.foto_rostro_url as string, `campo/rostros/${syncId}`, `rostro-${syncId}`)
+          ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : (p.foto_rostro_url as string | null);
 
         const [cerrada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
