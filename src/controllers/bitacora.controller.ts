@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
-import { validateImageUpload, validateMultipleImages } from "@/middleware/validate-upload";
 import type { JwtPayload } from "@/lib/jwt";
 import {
   crearBitacora,
