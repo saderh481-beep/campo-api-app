@@ -22,6 +22,14 @@ import {
 import { generateUploadSignature } from "@/lib/cloudinary";
 import { sql } from "@/db";
 
+const app = new Hono<{
+  Variables: {
+    tecnico: JwtPayload;
+  };
+}>();
+
+app.use("*", authMiddleware);
+
 app.get("/", async (c) => {
   const tecnico = c.get("tecnico");
   const limit = parseInt(c.req.query("limit") ?? "50");
