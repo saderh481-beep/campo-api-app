@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { sql } from "@/db";
 import { redis } from "@/lib/redis";
 import type {

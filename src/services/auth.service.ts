@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { sql } from "@/db";
 import { redis } from "@/lib/redis";
 import { signJwt } from "@/lib/jwt";

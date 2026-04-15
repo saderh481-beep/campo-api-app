@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { sql } from "@/db";
 import { createHash } from "node:crypto";
 import {

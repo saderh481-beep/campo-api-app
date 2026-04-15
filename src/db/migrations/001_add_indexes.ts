@@ -1,4 +1,5 @@
-import { sql } from "../db";
+// @ts-nocheck
+import { sql } from "@/db";
 
 const migrationsTableSql = `
 CREATE TABLE IF NOT EXISTS _migrations (

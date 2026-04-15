@@ -80,7 +80,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   if (!token) return c.json({ error: "no_autenticado", message: "No se proporcionó token de autenticación" }, 401);
 
   const payload = await verifyJwt(token);
-  if (!token) return c.json({ error: "token_invalido", message: "Token inválido o expirado" }, 401);
+  if (!payload) return c.json({ error: "token_invalido", message: "Token inválido o expirado" }, 401);
 
   let sessionRaw: string | null = null;
   try {
