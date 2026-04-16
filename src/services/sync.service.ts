@@ -466,40 +466,70 @@ sql`
         AND updated_at > ${desde.toISOString()}
       ORDER BY updated_at ASC
     `,
-    sql`
-      SELECT
-        ab.id,
-        ab.tecnico_id,
-        ab.beneficiario_id,
-        ab.activo,
-        ab.asignado_por,
-        ab.asignado_en,
-        ab.removido_en
-      FROM asignaciones_beneficiario ab
-      WHERE ab.tecnico_id = ${tecnicoId}
-        AND GREATEST(
-          COALESCE(ab.asignado_en, TIMESTAMP 'epoch'),
-          COALESCE(ab.removido_en, TIMESTAMP 'epoch')
-        ) > ${desde.toISOString()}
-      ORDER BY ab.asignado_en ASC
-    `,
-    sql`
-      SELECT
-        aa.id,
-        aa.tecnico_id,
-        aa.actividad_id,
-        aa.activo,
-        aa.asignado_por,
-        aa.asignado_en,
-        aa.removido_en
-      FROM asignaciones_actividad aa
-      WHERE aa.tecnico_id = ${tecnicoId}
-        AND GREATEST(
-          COALESCE(aa.asignado_en, TIMESTAMP 'epoch'),
-          COALESCE(aa.removido_en, TIMESTAMP 'epoch')
-        ) > ${desde.toISOString()}
-      ORDER BY aa.asignado_en ASC
-    `,
+    ultimoSync
+      ? sql`
+        SELECT
+          ab.id,
+          ab.tecnico_id,
+          ab.beneficiario_id,
+          ab.activo,
+          ab.asignado_por,
+          ab.asignado_en,
+          ab.removido_en
+        FROM asignaciones_beneficiario ab
+        WHERE ab.tecnico_id = ${tecnicoId}
+          AND GREATEST(
+            COALESCE(ab.asignado_en, TIMESTAMP 'epoch'),
+            COALESCE(ab.removido_en, TIMESTAMP 'epoch')
+          ) > ${desde.toISOString()}
+        ORDER BY ab.asignado_en ASC
+      `
+      : sql`
+        SELECT
+          ab.id,
+          ab.tecnico_id,
+          ab.beneficiario_id,
+          ab.activo,
+          ab.asignado_por,
+          ab.asignado_en,
+          ab.removido_en
+        FROM asignaciones_beneficiario ab
+        WHERE ab.tecnico_id = ${tecnicoId}
+          AND ab.activo = true
+        ORDER BY ab.asignado_en ASC
+      `,
+    ultimoSync
+      ? sql`
+        SELECT
+          aa.id,
+          aa.tecnico_id,
+          aa.actividad_id,
+          aa.activo,
+          aa.asignado_por,
+          aa.asignado_en,
+          aa.removido_en
+        FROM asignaciones_actividad aa
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND GREATEST(
+            COALESCE(aa.asignado_en, TIMESTAMP 'epoch'),
+            COALESCE(aa.removido_en, TIMESTAMP 'epoch')
+          ) > ${desde.toISOString()}
+        ORDER BY aa.asignado_en ASC
+      `
+      : sql`
+        SELECT
+          aa.id,
+          aa.tecnico_id,
+          aa.actividad_id,
+          aa.activo,
+          aa.asignado_por,
+          aa.asignado_en,
+          aa.removido_en
+        FROM asignaciones_actividad aa
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND aa.activo = true
+        ORDER BY aa.asignado_en ASC
+      `,
   ]);
 
   return {
