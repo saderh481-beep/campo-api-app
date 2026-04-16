@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { sql } from "@/db";
 import type { BitacoraResumen, Beneficiario } from "@/models";
-import { uploadFirmaFromBase64, uploadFotoRostroFromBase64 } from "@/lib/files-api";
+import { uploadFirmaFromBase64, uploadFotoRostroFromBase64, uploadFotosCampoFromBase64 } from "@/lib/files-api";
 
 function validarUUID(valor: unknown): boolean {
   if (!valor || typeof valor !== 'string') return false;
@@ -35,6 +35,23 @@ async function processImageFromDataUri(dataUri: string, type: 'firma' | 'rostro'
     }
   } catch (err) {
     console.error("[sync.service] Error procesando imagen:", err);
+    return null;
+  }
+}
+
+async function processFotosCampoFromDataUri(base64Array: string[], bitacoraId: string, tecnicoId: string): Promise<string[] | null> {
+  if (!base64Array || base64Array.length === 0) {
+    return null;
+  }
+  
+  try {
+    const result = await uploadFotosCampoFromBase64(bitacoraId, tecnicoId, base64Array);
+    if (result.success && result.fotos) {
+      return result.fotos.map(f => f.url);
+    }
+    return null;
+  } catch (err) {
+    console.error("[sync.service] Error procesando fotos campo:", err);
     return null;
   }
 }
@@ -175,6 +192,9 @@ export async function sincronizarOperaciones(
         const fotoRostroUrlValue = p.foto_rostro_url
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : null;
+        const fotosCampoUrls = p.fotos_campo && Array.isArray(p.fotos_campo)
+          ? await processFotosCampoFromDataUri(p.fotos_campo as string[], syncId, tecnicoId)
+          : null;
 
         const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
           INSERT INTO bitacoras (
@@ -204,7 +224,7 @@ export async function sincronizarOperaciones(
             ${(p.calificacion as number | null) ?? null},
             ${(p.reporte as string | null) ?? ''},
             ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null},
-            ${(p.fotos_campo as string[] | null) ? JSON.stringify(p.fotos_campo) : null}
+            ${fotosCampoUrls ? JSON.stringify(fotosCampoUrls) : null}
           )
           RETURNING id, estado, updated_at
         `;
@@ -236,6 +256,9 @@ export async function sincronizarOperaciones(
           : null;
         const fotoRostroUrlValue = p.foto_rostro_url
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
+          : null;
+        const fotosCampoUrls = p.fotos_campo && Array.isArray(p.fotos_campo)
+          ? await processFotosCampoFromDataUri(p.fotos_campo as string[], syncId, tecnicoId)
           : null;
 
         const [actualizada] = await sql.unsafe(`
@@ -277,7 +300,7 @@ export async function sincronizarOperaciones(
           (p.calificacion as number | null) ?? null,
           p.reporte as string | null,
           p.datos_extendidos ? JSON.stringify(p.datos_extendidos) : null,
-          p.fotos_campo ? JSON.stringify(p.fotos_campo) : null,
+          fotosCampoUrls ? JSON.stringify(fotosCampoUrls) : null,
           syncId,
           tecnicoId
         ]);
@@ -320,6 +343,9 @@ export async function sincronizarOperaciones(
         const fotoRostroUrlValue = p.foto_rostro_url && (p.foto_rostro_url as string).startsWith('data:')
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : (p.foto_rostro_url as string | null);
+        const fotosCampoUrls = p.fotos_campo && Array.isArray(p.fotos_campo)
+          ? await processFotosCampoFromDataUri(p.fotos_campo as string[], syncId, tecnicoId)
+          : null;
 
         const [cerrada] = await sql.unsafe(`
           UPDATE bitacoras SET
@@ -338,8 +364,9 @@ export async function sincronizarOperaciones(
             calificacion = $12,
             reporte = CASE WHEN $13 = '' THEN reporte ELSE $13 END,
             datos_extendidos = $14,
+            fotos_campo = CASE WHEN $15 IS NULL THEN fotos_campo ELSE $15 END,
             updated_at = NOW()
-          WHERE sync_id = $15 AND tecnico_id = $16
+          WHERE sync_id = $16 AND tecnico_id = $17
           RETURNING id, estado, updated_at
         `, [
           String(p.fecha_fin),
@@ -356,6 +383,7 @@ export async function sincronizarOperaciones(
           calif,
           reporteTxt,
           datosExt,
+          fotosCampoUrls ? JSON.stringify(fotosCampoUrls) : null,
           syncId,
           tecnicoId
         ]);
