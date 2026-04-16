@@ -93,6 +93,26 @@ app.get("/version", (c) =>
   c.json({ version: "1.0.0", deployedAt: new Date().toISOString() })
 );
 
+app.get("/cloudinary-config", (c) => {
+  const hasCloudinary = Boolean(
+    env.CLOUDINARY_CLOUD_NAME?.trim() &&
+      env.CLOUDINARY_API_KEY?.trim() &&
+      env.CLOUDINARY_API_SECRET?.trim()
+  );
+
+  if (!hasCloudinary) {
+    return c.json({ error: "Cloudinary no configurado", configured: false }, 500);
+  }
+
+  return c.json({
+    configured: true,
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    uploadPreset: env.CLOUDINARY_PRESET_IMAGENES,
+    docsPreset: env.CLOUDINARY_PRESET_DOCS,
+  });
+});
+
 app.get("/events/:tecnicoId", async (c) => {
   const tecnicoId = c.req.param("tecnicoId");
 
@@ -164,63 +184,6 @@ app.get("/events/:tecnicoId", async (c) => {
 
   return c.body(stream);
 });
-
-app.get("/cloudinary-config", (c) => {
-  const hasCloudinary = Boolean(
-    env.CLOUDINARY_CLOUD_NAME?.trim() &&
-      env.CLOUDINARY_API_KEY?.trim() &&
-      env.CLOUDINARY_API_SECRET?.trim()
-  );
-
-  if (!hasCloudinary) {
-    return c.json({ error: "Cloudinary no configurado", configured: false }, 500);
-  }
-
-  return c.json({
-    configured: true,
-    cloudName: env.CLOUDINARY_CLOUD_NAME,
-    apiKey: env.CLOUDINARY_API_KEY,
-    uploadPreset: env.CLOUDINARY_PRESET_IMAGENES,
-    docsPreset: env.CLOUDINARY_PRESET_DOCS,
-  });
-});
-
-app.get("/test-upload", async (c) => {
-  const hasCloudinary = Boolean(
-    env.CLOUDINARY_CLOUD_NAME?.trim() &&
-      env.CLOUDINARY_API_KEY?.trim() &&
-      env.CLOUDINARY_API_SECRET?.trim() &&
-      env.CLOUDINARY_PRESET_IMAGENES?.trim()
-  );
-
-  return c.json({
-    cloudinaryConfigured: hasCloudinary,
-    cloudName: env.CLOUDINARY_CLOUD_NAME,
-    preset: env.CLOUDINARY_PRESET_IMAGENES,
-    envCheck: {
-      CLOUDINARY_CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME ? "set" : "missing",
-      CLOUDINARY_API_KEY: env.CLOUDINARY_API_KEY ? "set" : "missing",
-      CLOUDINARY_API_SECRET: env.CLOUDINARY_API_SECRET ? "set" : "missing",
-      CLOUDINARY_PRESET_IMAGENES: env.CLOUDINARY_PRESET_IMAGENES ? "set" : "missing",
-    },
-  });
-});
-
-app.post("/test-upload-probe", async (c) => {
-  const { requireEnv } = await import("@/config/env");
-  
-  const result = {
-    cloudName: env.CLOUDINARY_CLOUD_NAME,
-    apiKey: env.CLOUDINARY_API_KEY,
-    presetImagenes: env.CLOUDINARY_PRESET_IMAGENES,
-    presetDocs: env.CLOUDINARY_PRESET_DOCS,
-  };
-
-  return c.json(result);
-});
-
-// Rutas de autenticación
-app.route("/api/v1/auth", authController);
 
 // Rutas de datos (beneficiarios, actividades, cadenas, localidades)
 app.route("/api/v1", beneficiarioController);

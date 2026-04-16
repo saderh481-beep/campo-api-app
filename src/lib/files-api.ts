@@ -1,7 +1,8 @@
 import { requireEnv } from "../config/env";
+import { env } from "../config/env";
 
-const FILES_API_URL = process.env.FILES_API_URL || "https://campo-api-files-campo-saas.up.railway.app";
-const FILES_API_KEY_APP = process.env.FILES_API_KEY_APP;
+const FILES_API_URL = env.CAMPO_FILES_API_URL || env.FILES_API_URL || "https://campo-api-files-campo-saas.up.railway.app";
+const FILES_API_KEY_APP = env.API_KEY_APP || env.FILES_API_KEY_APP;
 
 interface UploadResult {
   success: boolean;

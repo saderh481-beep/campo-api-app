@@ -3,16 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:watch": "bun test --watch",
     "lint": "tsc --noEmit",
     "db:init": "bun run scripts/init-db.ts",
-    "db:seed": "bun run scripts/seed-dev.ts",
-    "db:setup": "bun run scripts/init-db.ts && bun run scripts/seed-dev.ts",
-    "db:inspect": "bun run scripts/ver-estructura-db.ts",
     "db:migrate": "bun run scripts/run-migrations.ts"
   },
   "dependencies": {

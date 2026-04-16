@@ -75,7 +75,10 @@ CREATE TABLE IF NOT EXISTS beneficiarios (
   activo BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  localidad_id UUID REFERENCES localidades(id) ON DELETE SET NULL
+  localidad_id UUID REFERENCES localidades(id) ON DELETE SET NULL,
+  sync_id TEXT UNIQUE,
+  curp TEXT,
+  folio_saderh TEXT
 );
 
 CREATE TABLE IF NOT EXISTS beneficiario_cadenas (
@@ -143,7 +146,10 @@ CREATE TABLE IF NOT EXISTS bitacoras (
   sync_id TEXT UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  pdf_edicion JSONB NOT NULL DEFAULT '{}'::jsonb
+  pdf_edicion JSONB NOT NULL DEFAULT '{}'::jsonb,
+  calificacion INTEGER,
+  reporte TEXT,
+  datos_extendidos JSONB
 );
 
 CREATE INDEX IF NOT EXISTS bitacoras_tecnico_fecha_idx
