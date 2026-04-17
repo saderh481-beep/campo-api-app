@@ -1,4 +1,5 @@
-import { SignJWT, jwtVerify, TokenExpiredError, JSONWebTokenError } from "jose";
+import { SignJWT, jwtVerify } from "jose";
+import { JWTExpired, JWSInvalid } from "jose/errors";
 import { requireEnv } from "@/config/env";
 
 function getSecret() {
@@ -30,5 +31,19 @@ export async function signJwt(payload: JwtPayload): Promise<string> {
 }
 
 export async function verifyJwt(token: string): Promise<JwtPayload | null> {
-  try {\n    const { payload } = await jwtVerify(token, getSecret());\n    console.log(`[JWT] Verified successfully for sub: ${(payload as any).sub?.slice(0,8)}...`);\n    return payload as unknown as JwtPayload;\n  } catch (error) {\n    const tokenPreview = token.slice(0, 20) + '...';\n    if (error instanceof TokenExpiredError) {\n      console.error(`[JWT] Token expired: ${tokenPreview}`, error.message);\n    } else if (error instanceof JSONWebTokenError) {\n      console.error(`[JWT] Invalid token (sig/content): ${tokenPreview}`, error.message);\n    } else {\n      console.error(`[JWT] Verify error: ${tokenPreview}`, error);\n    }\n    return null;\n  }
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    console.log(`[JWT] Verified successfully for sub: ${(payload as any).sub?.slice(0,8)}...`);
+    return payload as unknown as JwtPayload;
+  } catch (error) {
+    const tokenPreview = token.slice(0, 20) + '...';
+    if (error instanceof JWTExpired) {
+      console.error(`[JWT] Token expired: ${tokenPreview}`);
+    } else if (error instanceof JWSInvalid) {
+      console.error(`[JWT] Invalid token: ${tokenPreview}`);
+    } else {
+      console.error(`[JWT] Verify error: ${tokenPreview}`, error);
+    }
+    return null;
+  }
 }

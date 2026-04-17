@@ -29,6 +29,35 @@ const app = new Hono<{
 
 app.use("*", authMiddleware);
 
+const schemaCrearBitacora = z.object({
+  tipo: z.enum(["beneficiario", "actividad"]),
+  beneficiario_id: z.string().uuid().optional(),
+  actividad_id: z.string().uuid().optional(),
+  cadena_productiva_id: z.string().uuid().optional(),
+  fecha_inicio: z.string().datetime().optional(),
+  coord_inicio: z.string().optional(),
+  actividades_desc: z.string().optional(),
+  recomendaciones: z.string().optional(),
+  comentarios_beneficiario: z.string().optional(),
+  coordinacion_interinst: z.boolean().optional(),
+  instancia_coordinada: z.string().optional(),
+  proposito_coordinacion: z.string().optional(),
+  observaciones_coordinador: z.string().optional(),
+});
+
+app.post("/", zValidator("json", schemaCrearBitacora), async (c) => {
+  const tecnico = c.get("tecnico");
+  const body = c.req.valid("json");
+
+  const result = await crearBitacora(tecnico.sub, body);
+
+  if ("duplicado" in result) {
+    return c.json({ error: "Ya existe una bitácora con este sync_id", existing: result }, 409);
+  }
+
+  return c.json(result, 201);
+});
+
 app.get("/", async (c) => {
   const tecnico = c.get("tecnico");
   const limit = parseInt(c.req.query("limit") ?? "50");
