@@ -110,11 +110,11 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
     return { success: false, error: "Código inválido o expirado" };
   }
 
-  console.log("[login] Tecnico encontrado:", tecnico.nombre, "id:", tecnico.id);
+  console.log("[login] Tecnico encontrado:", tecnico.nombre, "id:", tecnico.id, "activo:", tecnico.activo);
 
-  if (tecnico.activo === false) {
-    console.log("[login] Usuario inactivo");
-    return { success: false, error: " usuario_inactivo" };
+  if (tecnico.activo === false || tecnico.activo === null || tecnico.activo === 'false') {
+    console.log("[login] Usuario inactivo o nulo");
+    return { success: false, error: "usuario_inactivo" };
   }
 
   const fechaLimiteVencida = tecnico.fecha_limite
