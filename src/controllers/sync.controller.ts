@@ -146,6 +146,8 @@ app.post(
     const tecnico = c.get("tecnico");
     const { operaciones } = c.req.valid("json");
 
+    console.log("[sync] tecnico:", tecnico.sub, "operaciones:", operaciones?.length);
+    
     const resultado = await sincronizarOperaciones(tecnico.sub, operaciones);
     return c.json(resultado);
   }

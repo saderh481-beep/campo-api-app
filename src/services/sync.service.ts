@@ -64,6 +64,8 @@ export async function sincronizarOperaciones(
     payload: Record<string, unknown>;
   }>
 ) {
+  console.log("[sincronizarOperaciones] tecnicoId:", tecnicoId, "operaciones count:", operaciones?.length);
+  
   const ordenadas = [...operaciones].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
@@ -404,10 +406,12 @@ export async function sincronizarOperaciones(
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
+      console.error("[sincronizarOperaciones] Error en operacion:", op.operacion, "sync_id:", op.payload?.sync_id, "error:", msg);
       resultados.push({ operacion: op.operacion, exito: false, error: msg });
     }
   }
 
+  console.log("[sincronizarOperaciones] Completado, procesadas:", resultados.length, "exitosos:", resultados.filter(r => r.exito).length);
   return { procesadas: resultados.length, resultados };
 }
 
