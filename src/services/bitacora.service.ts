@@ -46,7 +46,7 @@ export async function crearBitacora(
     const [existente] = await sql.unsafe(`
       SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
       FROM bitacoras
-      WHERE sync_id = $1
+      WHERE sync_id = $1::text
     `, [syncId]);
     if (existente) {
       return { duplicado: true, ...existente };

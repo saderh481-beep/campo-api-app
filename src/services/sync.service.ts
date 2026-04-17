@@ -90,7 +90,7 @@ export async function sincronizarOperaciones(
         if (!syncId) throw new Error("sync_id requerido");
         
         const [existente] = await sql.unsafe(`
-          SELECT id FROM beneficiarios WHERE sync_id = $1 AND tecnico_id = $2
+          SELECT id FROM beneficiarios WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (existente) {
           resultados.push({
@@ -166,7 +166,7 @@ export async function sincronizarOperaciones(
         const [existente] = await sql.unsafe(`
           SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
           FROM bitacoras
-          WHERE sync_id = $1 AND tecnico_id = $2
+          WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (existente) {
           resultados.push({
@@ -246,7 +246,7 @@ export async function sincronizarOperaciones(
         if (!syncId) throw new Error("sync_id requerido");
 
         const [bitacora] = await sql.unsafe(`
-          SELECT id, estado FROM bitacoras WHERE sync_id = $1 AND tecnico_id = $2
+          SELECT id, estado FROM bitacoras WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
@@ -281,7 +281,7 @@ export async function sincronizarOperaciones(
             datos_extendidos = $16,
             fotos_campo = COALESCE($17, fotos_campo),
             updated_at = NOW()
-          WHERE sync_id = $18 AND tecnico_id = $19
+          WHERE sync_id = $18::text AND tecnico_id = $19
           RETURNING id, estado, updated_at
         `, [
           p.actividades_desc as string | null,
@@ -322,7 +322,7 @@ export async function sincronizarOperaciones(
         if (!syncId) throw new Error("sync_id requerido");
 
         const [bitacora] = await sql.unsafe(`
-          SELECT id, estado FROM bitacoras WHERE sync_id = $1 AND tecnico_id = $2
+          SELECT id, estado FROM bitacoras WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("La bitácora ya está cerrada");
@@ -366,7 +366,7 @@ export async function sincronizarOperaciones(
             datos_extendidos = $14,
             fotos_campo = CASE WHEN $15 IS NULL THEN fotos_campo ELSE $15 END,
             updated_at = NOW()
-          WHERE sync_id = $16 AND tecnico_id = $17
+          WHERE sync_id = $16::text AND tecnico_id = $17
           RETURNING id, estado, updated_at
         `, [
           String(p.fecha_fin),
@@ -544,4 +544,22 @@ sql`
       actividades: asignacionesActividad,
     },
   };
+}
+
+export async function obtenerBitacorasPendientesSync(tecnicoId: string) {
+  const bitacoras = await sql`
+    SELECT 
+      id, sync_id, tipo, estado, fecha_inicio, fecha_fin, 
+      coord_inicio, coord_fin, actividades_desc, recomendaciones,
+      comentarios_beneficiario, coordinacion_interinst, instancia_coordinada,
+      proposito_coordinacion, observaciones_coordinador, foto_rostro_url, 
+      firma_url, fotos_campo, calificacion, reporte, datos_extendidos,
+      created_at, updated_at, creada_offline
+    FROM bitacoras
+    WHERE tecnico_id = ${tecnicoId}
+      AND creada_offline = true
+      AND sync_id LIKE 'offline-%'
+    ORDER BY created_at DESC
+  `;
+  return bitacoras;
 }

@@ -4,7 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
-import { sincronizarOperaciones, obtenerDeltaSync } from "@/services/sync.service";
+import { sincronizarOperaciones, obtenerDeltaSync, obtenerBitacorasPendientesSync } from "@/services/sync.service";
 
 const app = new Hono<{
   Variables: {
@@ -155,19 +155,6 @@ app.get("/sync/delta", async (c) => {
   const tecnico = c.get("tecnico");
   const ultimoSync = c.req.query("ultimo_sync");
 
-  if (!ultimoSync) {
-    return c.json({
-      sync_ts: new Date().toISOString(),
-      beneficiarios: [],
-      actividades: [],
-      cadenas: [],
-      localidades: [],
-      bitacoras: [],
-      asignaciones: { beneficiarios: [], actividades: [] },
-      message: "Primera sincronización - no hay datos locales"
-    });
-  }
-
   const resultado = await obtenerDeltaSync(tecnico.sub, ultimoSync);
 
   if ("error" in resultado) {
@@ -179,6 +166,12 @@ app.get("/sync/delta", async (c) => {
   }
 
   return c.json(resultado);
+});
+
+app.get("/sync/pendientes", async (c) => {
+  const tecnico = c.get("tecnico");
+  const bitacorasPendientes = await obtenerBitacorasPendientesSync(tecnico.sub);
+  return c.json({ pendientes: bitacorasPendientes });
 });
 
 export default app;
