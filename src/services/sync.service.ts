@@ -495,9 +495,10 @@ esPrimeraSync
         WHERE activo = true AND updated_at > ${desde.toISOString()}
         ORDER BY municipio, nombre
       `,
-    esPrimeraSync
+esPrimeraSync
       ? sql`
         SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
+               beneficiario_id, actividad_id,
                actividades_desc, recomendaciones, comentarios_beneficiario,
                coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
                observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
@@ -509,6 +510,7 @@ esPrimeraSync
       `
       : sql`
         SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
+               beneficiario_id, actividad_id,
                actividades_desc, recomendaciones, comentarios_beneficiario,
                coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
                observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
