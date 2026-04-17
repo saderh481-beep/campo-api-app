@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
+import { sql } from "@/db";
 import { sincronizarOperaciones, obtenerDeltaSync, obtenerBitacorasPendientesSync, sincronizarBitacorasOffline } from "@/services/sync.service";
 
 const app = new Hono<{
@@ -157,6 +158,8 @@ app.get("/sync/delta", async (c) => {
   const tecnico = c.get("tecnico");
   const ultimoSync = c.req.query("ultimo_sync");
 
+  console.log("[sync/delta] tecnico:", tecnico.sub, "ultimoSync:", ultimoSync);
+  
   const resultado = await obtenerDeltaSync(tecnico.sub, ultimoSync);
 
   if ("error" in resultado) {
@@ -167,22 +170,23 @@ app.get("/sync/delta", async (c) => {
     }, 400);
   }
 
+  console.log("[sync/delta] Resultado - beneficiarios:", resultado.beneficiarios?.length, "bitacoras:", resultado.bitacoras?.length, "asignaciones:", resultado.asignaciones?.beneficiarios?.length);
+  
   return c.json(resultado);
 });
 
-app.get("/sync/pendientes", async (c) => {
+app.get("/sync/debug", async (c) => {
   const tecnico = c.get("tecnico");
-  const bitacorasPendientes = await obtenerBitacorasPendientesSync(tecnico.sub);
-  return c.json({ 
-    count: bitacorasPendientes.length,
-    pendientes: bitacorasPendientes.map(b => ({
-      id: b.id,
-      sync_id: b.sync_id,
-      tipo: b.tipo,
-      estado: b.estado,
-      creada_offline: b.creada_offline,
-      created_at: b.created_at
-    }))
+  
+  const [bitacorasCount] = await sql.unsafe(`SELECT COUNT(*)::int as total FROM bitacoras WHERE tecnico_id = $1`, [tecnico.sub]);
+  const [asignacionesBenCount] = await sql.unsafe(`SELECT COUNT(*)::int as total FROM asignaciones_beneficiario WHERE tecnico_id = $1 AND activo = true`, [tecnico.sub]);
+  const [asignacionesActCount] = await sql.unsafe(`SELECT COUNT(*)::int as total FROM asignaciones_actividad WHERE tecnico_id = $1 AND activo = true`, [tecnico.sub]);
+  
+  return c.json({
+    tecnico_id: tecnico.sub,
+    bitacoras_total: bitacorasCount?.total ?? 0,
+    asignaciones_beneficiarios: asignacionesBenCount?.total ?? 0,
+    asignaciones_actividades: asignacionesActCount?.total ?? 0,
   });
 });
 
