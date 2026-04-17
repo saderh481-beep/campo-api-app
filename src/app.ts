@@ -53,19 +53,14 @@ app.get("/health", async (c) => {
     },
   };
 
-  const startDb = Date.now();
-  try {
-    const { sql } = await import("@/db");
-    await sql`SELECT 1`;
-    health.services.database = {
-      status: "ok",
-      latencyMs: Date.now() - startDb,
-    };
-  } catch (error) {
-    health.services.database = {
-      status: "error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+  const { testConnection } = await import("@/db");
+  const dbResult = await testConnection();
+  health.services.database = {
+    status: dbResult.ok ? "ok" : "error",
+    latencyMs: dbResult.latencyMs,
+    error: dbResult.error,
+  };
+  if (!dbResult.ok) {
     health.status = "degraded";
   }
 
@@ -92,6 +87,53 @@ app.get("/health", async (c) => {
 app.get("/version", (c) =>
   c.json({ version: "1.0.0", deployedAt: new Date().toISOString() })
 );
+
+app.get("/db-diagnostico", async (c) => {
+  const diagnostico: {
+    timestamp: string;
+    connection: { status: string; latencyMs?: number; error?: string };
+    tablas: { name: string; rows?: number; error?: string }[];
+    recomendaciones: string[];
+  } = {
+    timestamp: new Date().toISOString(),
+    connection: { status: "unknown" },
+    tablas: [],
+    recomendaciones: [],
+  };
+
+  const { testConnection, sql } = await import("@/db");
+  const connResult = await testConnection();
+  
+  diagnostico.connection = {
+    status: connResult.ok ? "ok" : "error",
+    latencyMs: connResult.latencyMs,
+    error: connResult.error,
+  };
+  
+  if (!connResult.ok) {
+    diagnostico.recomendaciones.push("Verificar que DATABASE_URL sea correcta en el archivo .env");
+    diagnostico.recomendaciones.push("Verificar que el servicio de PostgreSQL esté disponible");
+    diagnostico.recomendaciones.push("Verificar credenciales de acceso (usuario, contraseña)");
+    return c.json(diagnostico, 503);
+  }
+
+  const tablas = ["usuarios", "beneficiarios", "bitacoras", "actividades", "cadenas_productivas", "notificaciones"];
+  
+  for (const tabla of tablas) {
+    try {
+      const [result]: any = await (sql as any).unsafe(`SELECT COUNT(*) as count FROM ${tabla}`);
+      diagnostico.tablas.push({ name: tabla, rows: result?.count ?? 0 });
+    } catch (error) {
+      diagnostico.tablas.push({ name: tabla, error: error instanceof Error ? error.message : "Error desconocido" });
+    }
+  }
+
+  if (diagnostico.tablas.length === 0) {
+    diagnostico.recomendaciones.push("Ejecutar script de inicialización: bun run db:init");
+  }
+
+  return c.json(diagnostico);
+});
 
 app.get("/cloudinary-config", (c) => {
   const hasCloudinary = Boolean(
