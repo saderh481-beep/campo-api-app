@@ -497,29 +497,35 @@ esPrimeraSync
       `,
 esPrimeraSync
       ? sql`
-        SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
-               beneficiario_id, actividad_id,
-               actividades_desc, recomendaciones, comentarios_beneficiario,
-               coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
-               observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
-               pdf_version, pdf_url_actual, pdf_original_url, pdf_edicion,
-               calificacion, reporte, datos_extendidos, created_at, updated_at
-        FROM bitacoras
-        WHERE tecnico_id = ${tecnicoId}
-        ORDER BY updated_at ASC
+        SELECT b.id, b.sync_id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin, 
+               b.coord_inicio, b.coord_fin, b.beneficiario_id, b.actividad_id,
+               b.actividades_desc, b.recomendaciones, b.comentarios_beneficiario,
+               b.coordinacion_interinst, b.instancia_coordinada, b.proposito_coordinacion,
+               b.observaciones_coordinador, b.foto_rostro_url, b.firma_url, b.fotos_campo,
+               b.pdf_version, b.pdf_url_actual, b.pdf_original_url, b.pdf_edicion,
+               b.calificacion, b.reporte, b.datos_extendidos, b.created_at, b.updated_at,
+               ben.nombre as beneficiario_nombre, act.nombre as actividad_nombre
+        FROM bitacoras b
+        LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
+        LEFT JOIN actividades act ON b.actividad_id = act.id
+        WHERE b.tecnico_id = ${tecnicoId}
+        ORDER BY b.updated_at ASC
       `
       : sql`
-        SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
-               beneficiario_id, actividad_id,
-               actividades_desc, recomendaciones, comentarios_beneficiario,
-               coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
-               observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
-               pdf_version, pdf_url_actual, pdf_original_url, pdf_edicion,
-               calificacion, reporte, datos_extendidos, created_at, updated_at
-        FROM bitacoras
-        WHERE tecnico_id = ${tecnicoId}
-          AND updated_at > ${desde.toISOString()}
-        ORDER BY updated_at ASC
+        SELECT b.id, b.sync_id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin, 
+               b.coord_inicio, b.coord_fin, b.beneficiario_id, b.actividad_id,
+               b.actividades_desc, b.recomendaciones, b.comentarios_beneficiario,
+               b.coordinacion_interinst, b.instancia_coordinada, b.proposito_coordinacion,
+               b.observaciones_coordinador, b.foto_rostro_url, b.firma_url, b.fotos_campo,
+               b.pdf_version, b.pdf_url_actual, b.pdf_original_url, b.pdf_edicion,
+               b.calificacion, b.reporte, b.datos_extendidos, b.created_at, b.updated_at,
+               ben.nombre as beneficiario_nombre, act.nombre as actividad_nombre
+        FROM bitacoras b
+        LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
+        LEFT JOIN actividades act ON b.actividad_id = act.id
+        WHERE b.tecnico_id = ${tecnicoId}
+          AND b.updated_at > ${desde.toISOString()}
+        ORDER BY b.updated_at ASC
       `,
 esPrimeraSync
       ? sql`
