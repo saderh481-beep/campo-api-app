@@ -412,8 +412,12 @@ export async function sincronizarOperaciones(
 }
 
 export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
-  const desde = ultimoSync ? new Date(ultimoSync) : new Date(0);
-  if (isNaN(desde.getTime())) {
+  const desde = ultimoSync && ultimoSync.trim() ? new Date(ultimoSync) : new Date(0);
+  const esPrimeraSync = !ultimoSync || !ultimoSync.trim();
+  
+  console.log("[obtenerDeltaSync] tecnicoId:", tecnicoId, "ultimoSync:", ultimoSync, "esPrimeraSync:", esPrimeraSync);
+  
+  if (!esPrimeraSync && isNaN(desde.getTime())) {
     return { error: "Formato de fecha inválido. Usa ISO 8601, ej: 2026-03-01T00:00:00Z" };
   }
 
@@ -426,80 +430,107 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
     asignacionesBeneficiario,
     asignacionesActividad,
   ] = await Promise.all([
-    sql`
-      SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.updated_at
-      FROM beneficiarios b
-      JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
-      WHERE ab.tecnico_id = ${tecnicoId}
-        AND ab.activo = true
-        AND b.activo = true
-        AND b.updated_at > ${desde.toISOString()}
-    `,
-    sql`
-      SELECT a.id, a.nombre, a.descripcion, a.updated_at
-      FROM actividades a
-      JOIN asignaciones_actividad aa ON aa.actividad_id = a.id
-      WHERE aa.tecnico_id = ${tecnicoId}
-        AND aa.activo = true
-        AND a.updated_at > ${desde.toISOString()}
-    `,
-    sql`
-      SELECT id, nombre, descripcion, updated_at
-      FROM cadenas_productivas
-      WHERE activo = true AND updated_at > ${desde.toISOString()}
-    `,
-    sql`
-      SELECT id, municipio, nombre, cp, updated_at
-      FROM localidades
-      WHERE activo = true AND updated_at > ${desde.toISOString()}
-      ORDER BY municipio, nombre
-    `,
-sql`
-      SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
-             actividades_desc, recomendaciones, comentarios_beneficiario,
-             coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
-             observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
-             pdf_version, pdf_url_actual, pdf_original_url, pdf_edicion,
-             calificacion, reporte, datos_extendidos, created_at, updated_at
-      FROM bitacoras
-      WHERE tecnico_id = ${tecnicoId}
-        AND updated_at > ${desde.toISOString()}
-      ORDER BY updated_at ASC
-    `,
-    ultimoSync
+    esPrimeraSync
       ? sql`
-        SELECT
-          ab.id,
-          ab.tecnico_id,
-          ab.beneficiario_id,
-          ab.activo,
-          ab.asignado_por,
-          ab.asignado_en,
-          ab.removido_en
-        FROM asignaciones_beneficiario ab
-        WHERE ab.tecnico_id = ${tecnicoId}
-          AND GREATEST(
-            COALESCE(ab.asignado_en, TIMESTAMP 'epoch'),
-            COALESCE(ab.removido_en, TIMESTAMP 'epoch')
-          ) > ${desde.toISOString()}
-        ORDER BY ab.asignado_en ASC
-      `
-      : sql`
-        SELECT
-          ab.id,
-          ab.tecnico_id,
-          ab.beneficiario_id,
-          ab.activo,
-          ab.asignado_por,
-          ab.asignado_en,
-          ab.removido_en
-        FROM asignaciones_beneficiario ab
+        SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.updated_at
+        FROM beneficiarios b
+        JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
         WHERE ab.tecnico_id = ${tecnicoId}
           AND ab.activo = true
-        ORDER BY ab.asignado_en ASC
+          AND b.activo = true
+        ORDER BY b.id, b.updated_at DESC
+      `
+      : sql`
+        SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.updated_at
+        FROM beneficiarios b
+        JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
+        WHERE ab.tecnico_id = ${tecnicoId}
+          AND ab.activo = true
+          AND b.activo = true
+          AND b.updated_at > ${desde.toISOString()}
       `,
-    ultimoSync
+esPrimeraSync
       ? sql`
+        SELECT a.id, a.nombre, a.descripcion, a.updated_at
+        FROM actividades a
+        JOIN asignaciones_actividad aa ON aa.actividad_id = a.id
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND aa.activo = true
+        ORDER BY a.nombre
+      `
+      : sql`
+        SELECT a.id, a.nombre, a.descripcion, a.updated_at
+        FROM actividades a
+        JOIN asignaciones_actividad aa ON aa.actividad_id = a.id
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND aa.activo = true
+          AND a.updated_at > ${desde.toISOString()}
+      `,
+    esPrimeraSync
+      ? sql`
+        SELECT id, nombre, descripcion, updated_at
+        FROM cadenas_productivas
+        WHERE activo = true
+        ORDER BY nombre
+      `
+      : sql`
+        SELECT id, nombre, descripcion, updated_at
+        FROM cadenas_productivas
+        WHERE activo = true AND updated_at > ${desde.toISOString()}
+      `,
+    esPrimeraSync
+      ? sql`
+        SELECT id, municipio, nombre, cp, updated_at
+        FROM localidades
+        WHERE activo = true
+        ORDER BY municipio, nombre
+      `
+      : sql`
+        SELECT id, municipio, nombre, cp, updated_at
+        FROM localidades
+        WHERE activo = true AND updated_at > ${desde.toISOString()}
+        ORDER BY municipio, nombre
+      `,
+    esPrimeraSync
+      ? sql`
+        SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
+               actividades_desc, recomendaciones, comentarios_beneficiario,
+               coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
+               observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
+               pdf_version, pdf_url_actual, pdf_original_url, pdf_edicion,
+               calificacion, reporte, datos_extendidos, created_at, updated_at
+        FROM bitacoras
+        WHERE tecnico_id = ${tecnicoId}
+        ORDER BY updated_at ASC
+      `
+      : sql`
+        SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
+               actividades_desc, recomendaciones, comentarios_beneficiario,
+               coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
+               observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
+               pdf_version, pdf_url_actual, pdf_original_url, pdf_edicion,
+               calificacion, reporte, datos_extendidos, created_at, updated_at
+        FROM bitacoras
+        WHERE tecnico_id = ${tecnicoId}
+          AND updated_at > ${desde.toISOString()}
+        ORDER BY updated_at ASC
+      `,
+esPrimeraSync
+      ? sql`
+        SELECT
+          aa.id,
+          aa.tecnico_id,
+          aa.actividad_id,
+          aa.activo,
+          aa.asignado_por,
+          aa.asignado_en,
+          aa.removido_en
+        FROM asignaciones_actividad aa
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND aa.activo = true
+        ORDER BY aa.asignado_en ASC
+      `
+      : sql`
         SELECT
           aa.id,
           aa.tecnico_id,
@@ -514,20 +545,6 @@ sql`
             COALESCE(aa.asignado_en, TIMESTAMP 'epoch'),
             COALESCE(aa.removido_en, TIMESTAMP 'epoch')
           ) > ${desde.toISOString()}
-        ORDER BY aa.asignado_en ASC
-      `
-      : sql`
-        SELECT
-          aa.id,
-          aa.tecnico_id,
-          aa.actividad_id,
-          aa.activo,
-          aa.asignado_por,
-          aa.asignado_en,
-          aa.removido_en
-        FROM asignaciones_actividad aa
-        WHERE aa.tecnico_id = ${tecnicoId}
-          AND aa.activo = true
         ORDER BY aa.asignado_en ASC
       `,
   ]);
