@@ -4,7 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
-import { sincronizarOperaciones, obtenerDeltaSync, obtenerBitacorasPendientesSync } from "@/services/sync.service";
+import { sincronizarOperaciones, obtenerDeltaSync, obtenerBitacorasPendientesSync, sincronizarBitacorasOffline } from "@/services/sync.service";
 
 const app = new Hono<{
   Variables: {
@@ -171,7 +171,29 @@ app.get("/sync/delta", async (c) => {
 app.get("/sync/pendientes", async (c) => {
   const tecnico = c.get("tecnico");
   const bitacorasPendientes = await obtenerBitacorasPendientesSync(tecnico.sub);
-  return c.json({ pendientes: bitacorasPendientes });
+  return c.json({ 
+    count: bitacorasPendientes.length,
+    pendientes: bitacorasPendientes.map(b => ({
+      id: b.id,
+      sync_id: b.sync_id,
+      tipo: b.tipo,
+      estado: b.estado,
+      creada_offline: b.creada_offline,
+      created_at: b.created_at
+    }))
+  });
+});
+
+app.post("/sync/sincronizar-offline", async (c) => {
+  const tecnico = c.get("tecnico");
+  const body = await c.req.json<{ sync_ids: string[] }>();
+  
+  if (!body.sync_ids || !Array.isArray(body.sync_ids)) {
+    return c.json({ error: "sync_ids requerido" }, 400);
+  }
+  
+  const resultado = await sincronizarBitacorasOffline(tecnico.sub, body.sync_ids);
+  return c.json(resultado);
 });
 
 export default app;

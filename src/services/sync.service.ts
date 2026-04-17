@@ -563,3 +563,72 @@ export async function obtenerBitacorasPendientesSync(tecnicoId: string) {
   `;
   return bitacoras;
 }
+
+export async function sincronizarBitacorasOffline(tecnicoId: string, syncIds: string[]) {
+  const resultados: { sync_id: string; exito: boolean; error?: string; nuevaBitacoraId?: string }[] = [];
+  
+  for (const syncId of syncIds) {
+    try {
+      const [bitacora] = await sql.unsafe(`
+        SELECT id, sync_id, tipo, beneficiario_id, actividad_id, 
+               fecha_inicio, coord_inicio, actividades_desc, recomendaciones,
+               comentarios_beneficiario, coordinacion_interinst, instancia_coordinada,
+               proposito_coordinacion, observaciones_coordinador, foto_rostro_url, 
+               firma_url, fotos_campo, calificacion, reporte, datos_extendidos
+        FROM bitacoras
+        WHERE tecnico_id = $1::text AND sync_id = $2::text
+      `, [tecnicoId, syncId]);
+      
+      if (!bitacora) {
+        resultados.push({ sync_id: syncId, exito: false, error: "Bitácora no encontrada" });
+        continue;
+      }
+      
+      const nuevoUuid = crypto.randomUUID();
+      
+      const [nueva] = await sql.unsafe(`
+        INSERT INTO bitacoras (
+          tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id,
+          beneficiario_id, actividad_id, actividades_desc, recomendaciones,
+          comentarios_beneficiario, coordinacion_interinst, instancia_coordinada,
+          proposito_coordinacion, observaciones_coordinador, foto_rostro_url, 
+          firma_url, fotos_campo, calificacion, reporte, datos_extendidos,
+          creada_offline
+        ) VALUES ($1::uuid, $2, 'borrador', $3, $4, $5::uuid, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, false)
+        RETURNING id
+      `, [
+        tecnicoId,
+        bitacora.tipo,
+        bitacora.fecha_inicio,
+        bitacora.coord_inicio,
+        nuevoUuid,
+        bitacora.beneficiario_id,
+        bitacora.actividad_id,
+        bitacora.actividades_desc,
+        bitacora.recomendaciones,
+        bitacora.comentarios_beneficiario,
+        bitacora.coordinacion_interinst,
+        bitacora.instancia_coordinada,
+        bitacora.proposito_coordinacion,
+        bitacora.observaciones_coordinador,
+        bitacora.foto_rostro_url,
+        bitacora.firma_url,
+        bitacora.fotos_campo,
+        bitacora.calificacion,
+        bitacora.reporte,
+        bitacora.datos_extendidos,
+      ]);
+      
+      await sql.unsafe(`
+        DELETE FROM bitacoras WHERE id = $1
+      `, [bitacora.id]);
+      
+      resultados.push({ sync_id: syncId, exito: true, nuevaBitacoraId: nueva.id });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Error desconocido";
+      resultados.push({ sync_id: syncId, exito: false, error: msg });
+    }
+  }
+  
+  return { sincronizados: resultados.length, resultados };
+}
