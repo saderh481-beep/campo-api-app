@@ -1,7 +1,10 @@
-import { requireEnv } from "../config/env";
+import { env } from "@/config/env";
 
-const FILES_API_URL = process.env.FILES_API_URL || "https://campo-api-files-campo-saas.up.railway.app";
-const FILES_API_KEY_APP = process.env.FILES_API_KEY_APP;
+const FILES_API_URL =
+  env.FILES_API_URL?.trim() ||
+  env.CAMPO_FILES_API_URL?.trim() ||
+  "https://campo-api-files-campo-saas.up.railway.app";
+const FILES_API_KEY_APP = env.FILES_API_KEY_APP?.trim();
 
 interface UploadResult {
   success: boolean;
@@ -32,14 +35,19 @@ function getApiKey(): string {
   return FILES_API_KEY_APP;
 }
 
-export async function uploadFirma(bitacoraId: string, buffer: Buffer, filename: string): Promise<UploadResult> {
+export async function uploadFirma(
+  bitacoraId: string,
+  buffer: Buffer,
+  filename: string,
+  mimeType = "image/png"
+): Promise<UploadResult> {
   try {
     const formData = new FormData();
     formData.append("bitacora_id", bitacoraId);
     
     const uint8Array = new Uint8Array(buffer);
-    const blob = new Blob([uint8Array], { type: "image/png" });
-    const file = new File([blob], filename, { type: "image/png" });
+    const blob = new Blob([uint8Array], { type: mimeType });
+    const file = new File([blob], filename, { type: mimeType });
     formData.append("files", file);
 
     const response = await fetch(`${FILES_API_URL}/upload/firma`, {
@@ -67,14 +75,19 @@ export async function uploadFirma(bitacoraId: string, buffer: Buffer, filename: 
   }
 }
 
-export async function uploadFotoRostro(bitacoraId: string, buffer: Buffer, filename: string): Promise<UploadResult> {
+export async function uploadFotoRostro(
+  bitacoraId: string,
+  buffer: Buffer,
+  filename: string,
+  mimeType = "image/jpeg"
+): Promise<UploadResult> {
   try {
     const formData = new FormData();
     formData.append("bitacora_id", bitacoraId);
     
     const uint8Array = new Uint8Array(buffer);
-    const blob = new Blob([uint8Array], { type: "image/jpeg" });
-    const file = new File([blob], filename, { type: "image/jpeg" });
+    const blob = new Blob([uint8Array], { type: mimeType });
+    const file = new File([blob], filename, { type: mimeType });
     formData.append("files", file);
 
     const response = await fetch(`${FILES_API_URL}/upload/foto-rostro`, {
@@ -157,10 +170,10 @@ export async function uploadFirmaFromBase64(bitacoraId: string, base64Data: stri
     const base64 = base64Match[2];
     const buffer = Buffer.from(base64, "base64");
     
-    const extension = mimeType.includes("png") ? "png" : "jpg";
+    const extension = mimeType.includes("svg") ? "svg" : mimeType.includes("png") ? "png" : "jpg";
     const filename = `firma_${Date.now()}.${extension}`;
 
-    return await uploadFirma(bitacoraId, buffer, filename);
+    return await uploadFirma(bitacoraId, buffer, filename, mimeType);
   } catch (err) {
     console.error("[files-api] Error procesando firma base64:", err);
     return { success: false, error: err instanceof Error ? err.message : "Error desconocido" };
@@ -181,7 +194,7 @@ export async function uploadFotoRostroFromBase64(bitacoraId: string, base64Data:
     const extension = mimeType.includes("png") ? "png" : "jpg";
     const filename = `rostro_${Date.now()}.${extension}`;
 
-    return await uploadFotoRostro(bitacoraId, buffer, filename);
+    return await uploadFotoRostro(bitacoraId, buffer, filename, mimeType);
   } catch (err) {
     console.error("[files-api] Error procesando foto rostro base64:", err);
     return { success: false, error: err instanceof Error ? err.message : "Error desconocido" };

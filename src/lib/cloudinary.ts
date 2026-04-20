@@ -86,14 +86,15 @@ function buildDataUrl(buffer: Buffer, mimeType: string) {
 function upload(
   buffer: Buffer,
   options: UploadApiOptions,
-  fallbackMimeType: string
+  fallbackMimeType: string,
+  mimeTypeOverride?: string
 ): Promise<{ secure_url: string; public_id: string }> {
   console.log("[Cloudinary] Intentando subir, tiene credenciales:", cloudinaryEnvConfigured(), "preset:", options.upload_preset);
   
   if (!cloudinaryEnvConfigured()) {
     console.log("[Cloudinary] No configurado completamente, retornando data URL");
     return Promise.resolve({
-      secure_url: buildDataUrl(buffer, fallbackMimeType),
+      secure_url: buildDataUrl(buffer, mimeTypeOverride ?? fallbackMimeType),
       public_id: String(options.public_id ?? `local-${Date.now()}`),
     });
   }
@@ -104,7 +105,17 @@ function upload(
 
   // Use base64 encoding for buffer upload - more reliable for Node.js
   const base64 = buffer.toString("base64");
-  const mimeType = fallbackMimeType.includes("webp") ? "image/webp" : fallbackMimeType.includes("png") ? "image/png" : "image/jpeg";
+  const mimeType =
+    mimeTypeOverride ??
+    (fallbackMimeType.includes("svg")
+      ? "image/svg+xml"
+      : fallbackMimeType.includes("webp")
+        ? "image/webp"
+        : fallbackMimeType.includes("png")
+          ? "image/png"
+          : fallbackMimeType.includes("pdf")
+            ? "application/pdf"
+            : "image/jpeg");
   const dataUri = `data:${mimeType};base64,${base64}`;
 
   return cloudinary.uploader.upload(dataUri, options)
@@ -129,13 +140,13 @@ export async function subirFotoRostro(buffer: Buffer, bitacoraId: string) {
   }, "image/jpeg");
 }
 
-export async function subirFirma(buffer: Buffer, bitacoraId: string) {
+export async function subirFirma(buffer: Buffer, bitacoraId: string, mimeType = "image/png") {
   return upload(buffer, {
     upload_preset: requireEnv("CLOUDINARY_PRESET_IMAGENES"),
     folder: `campo/firmas/${bitacoraId}`,
     public_id: `firma-${bitacoraId}`,
     resource_type: "image",
-  }, "image/png");
+  }, "image/png", mimeType);
 }
 
 export async function subirFotoCampo(buffer: Buffer, tecnicoId: string, mes: number, index: number) {

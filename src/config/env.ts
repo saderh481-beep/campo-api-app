@@ -31,6 +31,7 @@ const envSchema = z
     RATE_LIMIT_WINDOW_SECS: z.coerce.number().int().positive().default(60),
     MAX_UPLOAD_SIZE_MB: z.coerce.number().int().positive().default(10),
     FILES_API_URL: z.string().optional(),
+    CAMPO_FILES_API_URL: z.string().optional(),
     FILES_API_KEY_APP: z.string().optional(),
   })
   .refine(

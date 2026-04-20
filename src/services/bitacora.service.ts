@@ -31,6 +31,7 @@ export async function crearBitacora(
     calificacion?: number;
     reporte?: string;
     datos_extendidos?: Record<string, unknown>;
+    creada_offline?: boolean;
   }
 ) {
   const syncId = data.sync_id ? (() => {
@@ -63,7 +64,7 @@ export async function crearBitacora(
     ) VALUES (
       ${tecnicoId}, ${data.tipo}, 'borrador', ${data.fecha_inicio},
       ${data.coord_inicio ?? null},
-      ${data.sync_id ?? null},
+      ${syncId},
       ${data.beneficiario_id ?? null},
       ${data.tipo === "beneficiario" ? data.cadena_productiva_id ?? null : null},
       ${data.actividad_id ?? null},
@@ -294,14 +295,15 @@ export async function subirFotoRostroBitacora(
 export async function subirFirmaBitacora(
   tecnicoId: string,
   bitacoraId: string,
-  archivo: Buffer
+  archivo: Buffer,
+  mimeType = "image/png"
 ) {
   const [bitacora] = await sql`
     SELECT id FROM bitacoras WHERE id = ${bitacoraId} AND tecnico_id = ${tecnicoId}
   `;
   if (!bitacora) return { error: "Bitácora no encontrada" };
 
-  const { secure_url } = await subirFirma(archivo, bitacoraId);
+  const { secure_url } = await subirFirma(archivo, bitacoraId, mimeType);
   await sql`UPDATE bitacoras SET firma_url = ${secure_url}, updated_at = NOW() WHERE id = ${bitacoraId}`;
   return { firma_url: secure_url };
 }

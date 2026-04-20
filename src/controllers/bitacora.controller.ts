@@ -29,6 +29,57 @@ const app = new Hono<{
 
 app.use("*", authMiddleware);
 
+const schemaCrearBitacora = z
+  .object({
+    tipo: z.enum(["beneficiario", "actividad"]),
+    beneficiario_id: z.string().uuid().optional(),
+    actividad_id: z.string().uuid().optional(),
+    cadena_productiva_id: z.string().uuid().optional(),
+    fecha_inicio: z.string().datetime().optional(),
+    coord_inicio: z.string().optional(),
+    sync_id: z.string().optional(),
+    actividades_desc: z.string().optional(),
+    recomendaciones: z.string().optional(),
+    comentarios_beneficiario: z.string().optional(),
+    coordinacion_interinst: z.boolean().optional(),
+    instancia_coordinada: z.string().optional(),
+    proposito_coordinacion: z.string().optional(),
+    observaciones_coordinador: z.string().optional(),
+    calificacion: z.number().int().min(1).max(10).optional(),
+    reporte: z.string().optional(),
+    datos_extendidos: z.any().optional(),
+    creada_offline: z.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.tipo === "beneficiario" && !value.beneficiario_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["beneficiario_id"],
+        message: "beneficiario_id es requerido para bitácoras de beneficiario",
+      });
+    }
+
+    if (value.tipo === "actividad" && !value.actividad_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["actividad_id"],
+        message: "actividad_id es requerido para bitácoras de actividad",
+      });
+    }
+  });
+
+app.post("/", zValidator("json", schemaCrearBitacora), async (c) => {
+  const tecnico = c.get("tecnico");
+  const body = c.req.valid("json");
+
+  const resultado = await crearBitacora(tecnico.sub, {
+    ...body,
+    fecha_inicio: body.fecha_inicio ?? new Date().toISOString(),
+  });
+
+  return c.json(resultado, "duplicado" in resultado ? 200 : 201);
+});
+
 app.get("/", async (c) => {
   const tecnico = c.get("tecnico");
   const limit = parseInt(c.req.query("limit") ?? "50");
@@ -167,10 +218,10 @@ app.post("/:id/firma", async (c) => {
     return c.json({ error: "Firma requerida y debe ser un archivo" }, 400);
   }
 
-  if (!["image/jpeg", "image/png", "image/webp"].includes(archivo.type)) {
+  if (!["image/jpeg", "image/png", "image/webp", "image/svg+xml"].includes(archivo.type)) {
     return c.json({ 
       error: "Tipo de archivo no permitido", 
-      allowedTypes: ["image/jpeg", "image/png", "image/webp"],
+      allowedTypes: ["image/jpeg", "image/png", "image/webp", "image/svg+xml"],
       receivedType: archivo.type 
     }, 400);
   }
@@ -184,7 +235,7 @@ app.post("/:id/firma", async (c) => {
   }
 
   const buffer = Buffer.from(await archivo.arrayBuffer());
-  const resultado = await subirFirmaBitacora(tecnico.sub, id, buffer);
+  const resultado = await subirFirmaBitacora(tecnico.sub, id, buffer, archivo.type || "image/png");
 
   if ("error" in resultado) {
     return c.json({ error: resultado.error }, 404);
