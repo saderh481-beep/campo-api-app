@@ -72,7 +72,7 @@ app.post("/", zValidator("json", schemaCrearBitacora), async (c) => {
   const tecnico = c.get("tecnico");
   const body = c.req.valid("json");
 
-  const resultado = await crearBitacora(tecnico.sub, {
+const resultado = await crearBitacora(tecnico.sub, {
     ...body,
     fecha_inicio: body.fecha_inicio ?? new Date().toISOString(),
   });

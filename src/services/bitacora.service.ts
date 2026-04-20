@@ -34,20 +34,23 @@ export async function crearBitacora(
     creada_offline?: boolean;
   }
 ) {
-  const syncId = data.sync_id ? (() => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const offlineRegex = /^offline-\d+-[a-z0-9]+$/i;
-    if (uuidRegex.test(data.sync_id) || offlineRegex.test(data.sync_id)) {
-      return data.sync_id;
-    }
-    return null;
-  })() : null;
+  const providedSyncId = data.sync_id;
+  const syncId = providedSyncId 
+    ? (() => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const offlineRegex = /^offline-\d+-[a-z0-9]+$/i;
+        if (uuidRegex.test(providedSyncId) || offlineRegex.test(providedSyncId)) {
+          return providedSyncId;
+        }
+        return null;
+      })()
+    : crypto.randomUUID();
 
   if (syncId) {
     const [existente] = await sql.unsafe(`
       SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
       FROM bitacoras
-      WHERE sync_id = $1
+      WHERE sync_id = $1::text
     `, [syncId]);
     if (existente) {
       return { duplicado: true, ...existente };
@@ -62,18 +65,18 @@ export async function crearBitacora(
       coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
       observaciones_coordinador, calificacion, reporte, datos_extendidos
     ) VALUES (
-      ${tecnicoId}, ${data.tipo}, 'borrador', ${data.fecha_inicio},
+      ${tecnicoId}, ${data.tipo}, 'borrador', ${data.fecha_inicio ?? new Date().toISOString()},
       ${data.coord_inicio ?? null},
       ${syncId},
       ${data.beneficiario_id ?? null},
       ${data.tipo === "beneficiario" ? data.cadena_productiva_id ?? null : null},
       ${data.actividad_id ?? null},
       ${data.actividades_desc ?? ''},
-${data.recomendaciones ?? ''},
-${data.comentarios_beneficiario ?? ''},
+      ${data.recomendaciones ?? ''},
+      ${data.comentarios_beneficiario ?? ''},
       ${data.coordinacion_interinst ?? false},
-${data.instancia_coordinada ?? ''},
-${data.proposito_coordinacion ?? ''},
+      ${data.instancia_coordinada ?? ''},
+      ${data.proposito_coordinacion ?? ''},
       ${data.observaciones_coordinador ?? null},
       ${data.calificacion ?? null},
       ${data.reporte ?? null},

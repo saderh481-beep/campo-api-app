@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { sql } from "@/db";
 import type { BitacoraResumen, Beneficiario } from "@/models";
-import { uploadFirmaFromBase64, uploadFotoRostroFromBase64 } from "@/lib/files-api";
+import { uploadFirmaFromBase64, uploadFotoRostroFromBase64, uploadFotosCampoFromBase64 } from "@/lib/files-api";
 
 function validarUUID(valor: unknown): boolean {
   if (!valor || typeof valor !== 'string') return false;
@@ -39,6 +39,23 @@ async function processImageFromDataUri(dataUri: string, type: 'firma' | 'rostro'
   }
 }
 
+async function processFotosCampoFromDataUri(base64Array: string[], bitacoraId: string, tecnicoId: string): Promise<string[] | null> {
+  if (!base64Array || base64Array.length === 0) {
+    return null;
+  }
+  
+  try {
+    const result = await uploadFotosCampoFromBase64(bitacoraId, tecnicoId, base64Array);
+    if (result.success && result.fotos) {
+      return result.fotos.map(f => f.url);
+    }
+    return null;
+  } catch (err) {
+    console.error("[sync.service] Error procesando fotos campo:", err);
+    return null;
+  }
+}
+
 export async function sincronizarOperaciones(
   tecnicoId: string,
   operaciones: Array<{
@@ -47,6 +64,8 @@ export async function sincronizarOperaciones(
     payload: Record<string, unknown>;
   }>
 ) {
+  console.log("[sincronizarOperaciones] tecnicoId:", tecnicoId, "operaciones count:", operaciones?.length);
+  
   const ordenadas = [...operaciones].sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
@@ -73,7 +92,7 @@ export async function sincronizarOperaciones(
         if (!syncId) throw new Error("sync_id requerido");
         
         const [existente] = await sql.unsafe(`
-          SELECT id FROM beneficiarios WHERE sync_id = $1 AND tecnico_id = $2
+          SELECT id FROM beneficiarios WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (existente) {
           resultados.push({
@@ -149,7 +168,7 @@ export async function sincronizarOperaciones(
         const [existente] = await sql.unsafe(`
           SELECT id, tipo, estado, fecha_inicio, fecha_fin, sync_id
           FROM bitacoras
-          WHERE sync_id = $1 AND tecnico_id = $2
+          WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (existente) {
           resultados.push({
@@ -174,6 +193,9 @@ export async function sincronizarOperaciones(
           : null;
         const fotoRostroUrlValue = p.foto_rostro_url
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
+          : null;
+        const fotosCampoUrls = p.fotos_campo && Array.isArray(p.fotos_campo)
+          ? await processFotosCampoFromDataUri(p.fotos_campo as string[], syncId, tecnicoId)
           : null;
 
         const [creada] = await sql<{ id: string; estado: string; updated_at: string }[]>`
@@ -204,7 +226,7 @@ export async function sincronizarOperaciones(
             ${(p.calificacion as number | null) ?? null},
             ${(p.reporte as string | null) ?? ''},
             ${(p.datos_extendidos as Record<string, unknown> | null) ? JSON.stringify(p.datos_extendidos) : null},
-            ${(p.fotos_campo as string[] | null) ? JSON.stringify(p.fotos_campo) : null}
+            ${fotosCampoUrls ? JSON.stringify(fotosCampoUrls) : null}
           )
           RETURNING id, estado, updated_at
         `;
@@ -226,7 +248,7 @@ export async function sincronizarOperaciones(
         if (!syncId) throw new Error("sync_id requerido");
 
         const [bitacora] = await sql.unsafe(`
-          SELECT id, estado FROM bitacoras WHERE sync_id = $1 AND tecnico_id = $2
+          SELECT id, estado FROM bitacoras WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("Solo se pueden editar borradores");
@@ -236,6 +258,9 @@ export async function sincronizarOperaciones(
           : null;
         const fotoRostroUrlValue = p.foto_rostro_url
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
+          : null;
+        const fotosCampoUrls = p.fotos_campo && Array.isArray(p.fotos_campo)
+          ? await processFotosCampoFromDataUri(p.fotos_campo as string[], syncId, tecnicoId)
           : null;
 
         const [actualizada] = await sql.unsafe(`
@@ -258,7 +283,7 @@ export async function sincronizarOperaciones(
             datos_extendidos = $16,
             fotos_campo = COALESCE($17, fotos_campo),
             updated_at = NOW()
-          WHERE sync_id = $18 AND tecnico_id = $19
+          WHERE sync_id = $18::text AND tecnico_id = $19
           RETURNING id, estado, updated_at
         `, [
           p.actividades_desc as string | null,
@@ -277,7 +302,7 @@ export async function sincronizarOperaciones(
           (p.calificacion as number | null) ?? null,
           p.reporte as string | null,
           p.datos_extendidos ? JSON.stringify(p.datos_extendidos) : null,
-          p.fotos_campo ? JSON.stringify(p.fotos_campo) : null,
+          fotosCampoUrls ? JSON.stringify(fotosCampoUrls) : null,
           syncId,
           tecnicoId
         ]);
@@ -299,7 +324,7 @@ export async function sincronizarOperaciones(
         if (!syncId) throw new Error("sync_id requerido");
 
         const [bitacora] = await sql.unsafe(`
-          SELECT id, estado FROM bitacoras WHERE sync_id = $1 AND tecnico_id = $2
+          SELECT id, estado FROM bitacoras WHERE sync_id = $1::text AND tecnico_id = $2
         `, [syncId, tecnicoId]);
         if (!bitacora) throw new Error("Bitácora no encontrada");
         if (bitacora.estado !== "borrador") throw new Error("La bitácora ya está cerrada");
@@ -320,6 +345,9 @@ export async function sincronizarOperaciones(
         const fotoRostroUrlValue = p.foto_rostro_url && (p.foto_rostro_url as string).startsWith('data:')
           ? await processImageFromDataUri(p.foto_rostro_url as string, 'rostro', syncId)
           : (p.foto_rostro_url as string | null);
+        const fotosCampoUrls = p.fotos_campo && Array.isArray(p.fotos_campo)
+          ? await processFotosCampoFromDataUri(p.fotos_campo as string[], syncId, tecnicoId)
+          : null;
 
         const [cerrada] = await sql.unsafe(`
           UPDATE bitacoras SET
@@ -338,8 +366,9 @@ export async function sincronizarOperaciones(
             calificacion = $12,
             reporte = CASE WHEN $13 = '' THEN reporte ELSE $13 END,
             datos_extendidos = $14,
+            fotos_campo = CASE WHEN $15 IS NULL THEN fotos_campo ELSE $15 END,
             updated_at = NOW()
-          WHERE sync_id = $15 AND tecnico_id = $16
+          WHERE sync_id = $16::text AND tecnico_id = $17
           RETURNING id, estado, updated_at
         `, [
           String(p.fecha_fin),
@@ -356,6 +385,7 @@ export async function sincronizarOperaciones(
           calif,
           reporteTxt,
           datosExt,
+          fotosCampoUrls ? JSON.stringify(fotosCampoUrls) : null,
           syncId,
           tecnicoId
         ]);
@@ -376,16 +406,22 @@ export async function sincronizarOperaciones(
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
+      console.error("[sincronizarOperaciones] Error en operacion:", op.operacion, "sync_id:", op.payload?.sync_id, "error:", msg);
       resultados.push({ operacion: op.operacion, exito: false, error: msg });
     }
   }
 
+  console.log("[sincronizarOperaciones] Completado, procesadas:", resultados.length, "exitosos:", resultados.filter(r => r.exito).length);
   return { procesadas: resultados.length, resultados };
 }
 
 export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
-  const desde = ultimoSync ? new Date(ultimoSync) : new Date(0);
-  if (isNaN(desde.getTime())) {
+  const desde = ultimoSync && ultimoSync.trim() ? new Date(ultimoSync) : new Date(0);
+  const esPrimeraSync = !ultimoSync || !ultimoSync.trim();
+  
+  console.log("[obtenerDeltaSync] tecnicoId:", tecnicoId, "ultimoSync:", ultimoSync, "esPrimeraSync:", esPrimeraSync);
+  
+  if (!esPrimeraSync && isNaN(desde.getTime())) {
     return { error: "Formato de fecha inválido. Usa ISO 8601, ej: 2026-03-01T00:00:00Z" };
   }
 
@@ -398,80 +434,131 @@ export async function obtenerDeltaSync(tecnicoId: string, ultimoSync?: string) {
     asignacionesBeneficiario,
     asignacionesActividad,
   ] = await Promise.all([
-    sql`
-      SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.updated_at
-      FROM beneficiarios b
-      JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
-      WHERE ab.tecnico_id = ${tecnicoId}
-        AND ab.activo = true
-        AND b.activo = true
-        AND b.updated_at > ${desde.toISOString()}
-    `,
-    sql`
-      SELECT a.id, a.nombre, a.descripcion, a.updated_at
-      FROM actividades a
-      JOIN asignaciones_actividad aa ON aa.actividad_id = a.id
-      WHERE aa.tecnico_id = ${tecnicoId}
-        AND aa.activo = true
-        AND a.updated_at > ${desde.toISOString()}
-    `,
-    sql`
-      SELECT id, nombre, descripcion, updated_at
-      FROM cadenas_productivas
-      WHERE activo = true AND updated_at > ${desde.toISOString()}
-    `,
-    sql`
-      SELECT id, municipio, nombre, cp, updated_at
-      FROM localidades
-      WHERE activo = true AND updated_at > ${desde.toISOString()}
-      ORDER BY municipio, nombre
-    `,
-sql`
-      SELECT id, sync_id, tipo, estado, fecha_inicio, fecha_fin, coord_inicio, coord_fin,
-             actividades_desc, recomendaciones, comentarios_beneficiario,
-             coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
-             observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
-             pdf_version, pdf_url_actual, pdf_original_url, pdf_edicion,
-             calificacion, reporte, datos_extendidos, created_at, updated_at
-      FROM bitacoras
-      WHERE tecnico_id = ${tecnicoId}
-        AND updated_at > ${desde.toISOString()}
-      ORDER BY updated_at ASC
-    `,
-    sql`
-      SELECT
-        ab.id,
-        ab.tecnico_id,
-        ab.beneficiario_id,
-        ab.activo,
-        ab.asignado_por,
-        ab.asignado_en,
-        ab.removido_en
-      FROM asignaciones_beneficiario ab
-      WHERE ab.tecnico_id = ${tecnicoId}
-        AND GREATEST(
-          COALESCE(ab.asignado_en, TIMESTAMP 'epoch'),
-          COALESCE(ab.removido_en, TIMESTAMP 'epoch')
-        ) > ${desde.toISOString()}
-      ORDER BY ab.asignado_en ASC
-    `,
-    sql`
-      SELECT
-        aa.id,
-        aa.tecnico_id,
-        aa.actividad_id,
-        aa.activo,
-        aa.asignado_por,
-        aa.asignado_en,
-        aa.removido_en
-      FROM asignaciones_actividad aa
-      WHERE aa.tecnico_id = ${tecnicoId}
-        AND GREATEST(
-          COALESCE(aa.asignado_en, TIMESTAMP 'epoch'),
-          COALESCE(aa.removido_en, TIMESTAMP 'epoch')
-        ) > ${desde.toISOString()}
-      ORDER BY aa.asignado_en ASC
-    `,
+    esPrimeraSync
+      ? sql`
+        SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.updated_at
+        FROM beneficiarios b
+        JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
+        WHERE ab.tecnico_id = ${tecnicoId}
+          AND ab.activo = true
+          AND b.activo = true
+        ORDER BY b.id, b.updated_at DESC
+      `
+      : sql`
+        SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.updated_at
+        FROM beneficiarios b
+        JOIN asignaciones_beneficiario ab ON ab.beneficiario_id = b.id
+        WHERE ab.tecnico_id = ${tecnicoId}
+          AND ab.activo = true
+          AND b.activo = true
+          AND b.updated_at > ${desde.toISOString()}
+      `,
+esPrimeraSync
+      ? sql`
+        SELECT a.id, a.nombre, a.descripcion, a.updated_at
+        FROM actividades a
+        JOIN asignaciones_actividad aa ON aa.actividad_id = a.id
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND aa.activo = true
+        ORDER BY a.nombre
+      `
+      : sql`
+        SELECT a.id, a.nombre, a.descripcion, a.updated_at
+        FROM actividades a
+        JOIN asignaciones_actividad aa ON aa.actividad_id = a.id
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND aa.activo = true
+          AND a.updated_at > ${desde.toISOString()}
+      `,
+    esPrimeraSync
+      ? sql`
+        SELECT id, nombre, descripcion, updated_at
+        FROM cadenas_productivas
+        WHERE activo = true
+        ORDER BY nombre
+      `
+      : sql`
+        SELECT id, nombre, descripcion, updated_at
+        FROM cadenas_productivas
+        WHERE activo = true AND updated_at > ${desde.toISOString()}
+      `,
+    esPrimeraSync
+      ? sql`
+        SELECT id, municipio, nombre, cp, updated_at
+        FROM localidades
+        WHERE activo = true
+        ORDER BY municipio, nombre
+      `
+      : sql`
+        SELECT id, municipio, nombre, cp, updated_at
+        FROM localidades
+        WHERE activo = true AND updated_at > ${desde.toISOString()}
+        ORDER BY municipio, nombre
+      `,
+esPrimeraSync
+      ? sql`
+        SELECT b.id, b.sync_id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin, 
+               b.coord_inicio, b.coord_fin, b.beneficiario_id, b.actividad_id,
+               b.actividades_desc, b.recomendaciones, b.comentarios_beneficiario,
+               b.coordinacion_interinst, b.instancia_coordinada, b.proposito_coordinacion,
+               b.observaciones_coordinador, b.foto_rostro_url, b.firma_url, b.fotos_campo,
+               b.pdf_version, b.pdf_url_actual, b.pdf_original_url, b.pdf_edicion,
+               b.calificacion, b.reporte, b.datos_extendidos, b.created_at, b.updated_at,
+               ben.nombre as beneficiario_nombre, act.nombre as actividad_nombre
+        FROM bitacoras b
+        LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
+        LEFT JOIN actividades act ON b.actividad_id = act.id
+        WHERE b.tecnico_id = ${tecnicoId}
+        ORDER BY b.updated_at ASC
+      `
+      : sql`
+        SELECT b.id, b.sync_id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin, 
+               b.coord_inicio, b.coord_fin, b.beneficiario_id, b.actividad_id,
+               b.actividades_desc, b.recomendaciones, b.comentarios_beneficiario,
+               b.coordinacion_interinst, b.instancia_coordinada, b.proposito_coordinacion,
+               b.observaciones_coordinador, b.foto_rostro_url, b.firma_url, b.fotos_campo,
+               b.pdf_version, b.pdf_url_actual, b.pdf_original_url, b.pdf_edicion,
+               b.calificacion, b.reporte, b.datos_extendidos, b.created_at, b.updated_at,
+               ben.nombre as beneficiario_nombre, act.nombre as actividad_nombre
+        FROM bitacoras b
+        LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
+        LEFT JOIN actividades act ON b.actividad_id = act.id
+        WHERE b.tecnico_id = ${tecnicoId}
+          AND b.updated_at > ${desde.toISOString()}
+        ORDER BY b.updated_at ASC
+      `,
+esPrimeraSync
+      ? sql`
+        SELECT
+          aa.id,
+          aa.tecnico_id,
+          aa.actividad_id,
+          aa.activo,
+          aa.asignado_por,
+          aa.asignado_en,
+          aa.removido_en
+        FROM asignaciones_actividad aa
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND aa.activo = true
+        ORDER BY aa.asignado_en ASC
+      `
+      : sql`
+        SELECT
+          aa.id,
+          aa.tecnico_id,
+          aa.actividad_id,
+          aa.activo,
+          aa.asignado_por,
+          aa.asignado_en,
+          aa.removido_en
+        FROM asignaciones_actividad aa
+        WHERE aa.tecnico_id = ${tecnicoId}
+          AND GREATEST(
+            COALESCE(aa.asignado_en, TIMESTAMP 'epoch'),
+            COALESCE(aa.removido_en, TIMESTAMP 'epoch')
+          ) > ${desde.toISOString()}
+        ORDER BY aa.asignado_en ASC
+      `,
   ]);
 
   return {
@@ -486,4 +573,91 @@ sql`
       actividades: asignacionesActividad,
     },
   };
+}
+
+export async function obtenerBitacorasPendientesSync(tecnicoId: string) {
+  const bitacoras = await sql`
+    SELECT 
+      id, sync_id, tipo, estado, fecha_inicio, fecha_fin, 
+      coord_inicio, coord_fin, actividades_desc, recomendaciones,
+      comentarios_beneficiario, coordinacion_interinst, instancia_coordinada,
+      proposito_coordinacion, observaciones_coordinador, foto_rostro_url, 
+      firma_url, fotos_campo, calificacion, reporte, datos_extendidos,
+      created_at, updated_at, creada_offline
+    FROM bitacoras
+    WHERE tecnico_id = ${tecnicoId}
+      AND creada_offline = true
+      AND sync_id LIKE 'offline-%'
+    ORDER BY created_at DESC
+  `;
+  return bitacoras;
+}
+
+export async function sincronizarBitacorasOffline(tecnicoId: string, syncIds: string[]) {
+  const resultados: { sync_id: string; exito: boolean; error?: string; nuevaBitacoraId?: string }[] = [];
+  
+  for (const syncId of syncIds) {
+    try {
+      const [bitacora] = await sql.unsafe(`
+        SELECT id, sync_id, tipo, beneficiario_id, actividad_id, 
+               fecha_inicio, coord_inicio, actividades_desc, recomendaciones,
+               comentarios_beneficiario, coordinacion_interinst, instancia_coordinada,
+               proposito_coordinacion, observaciones_coordinador, foto_rostro_url, 
+               firma_url, fotos_campo, calificacion, reporte, datos_extendidos
+        FROM bitacoras
+        WHERE tecnico_id = $1::text AND sync_id = $2::text
+      `, [tecnicoId, syncId]);
+      
+      if (!bitacora) {
+        resultados.push({ sync_id: syncId, exito: false, error: "Bitácora no encontrada" });
+        continue;
+      }
+      
+      const nuevoUuid = crypto.randomUUID();
+      
+      const [nueva] = await sql.unsafe(`
+        INSERT INTO bitacoras (
+          tecnico_id, tipo, estado, fecha_inicio, coord_inicio, sync_id,
+          beneficiario_id, actividad_id, actividades_desc, recomendaciones,
+          comentarios_beneficiario, coordinacion_interinst, instancia_coordinada,
+          proposito_coordinacion, observaciones_coordinador, foto_rostro_url, 
+          firma_url, fotos_campo, calificacion, reporte, datos_extendidos,
+          creada_offline
+        ) VALUES ($1::uuid, $2, 'borrador', $3, $4, $5::uuid, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, false)
+        RETURNING id
+      `, [
+        tecnicoId,
+        bitacora.tipo,
+        bitacora.fecha_inicio,
+        bitacora.coord_inicio,
+        nuevoUuid,
+        bitacora.beneficiario_id,
+        bitacora.actividad_id,
+        bitacora.actividades_desc,
+        bitacora.recomendaciones,
+        bitacora.comentarios_beneficiario,
+        bitacora.coordinacion_interinst,
+        bitacora.instancia_coordinada,
+        bitacora.proposito_coordinacion,
+        bitacora.observaciones_coordinador,
+        bitacora.foto_rostro_url,
+        bitacora.firma_url,
+        bitacora.fotos_campo,
+        bitacora.calificacion,
+        bitacora.reporte,
+        bitacora.datos_extendidos,
+      ]);
+      
+      await sql.unsafe(`
+        DELETE FROM bitacoras WHERE id = $1
+      `, [bitacora.id]);
+      
+      resultados.push({ sync_id: syncId, exito: true, nuevaBitacoraId: nueva.id });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Error desconocido";
+      resultados.push({ sync_id: syncId, exito: false, error: msg });
+    }
+  }
+  
+  return { sincronizados: resultados.length, resultados };
 }

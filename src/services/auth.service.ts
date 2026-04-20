@@ -23,140 +23,33 @@ async function codigoCoincideConHash(codigo: string, hash: string | null) {
   if (!hash) return false;
 
   try {
-    return await Bun.password.verify(codigo, hash);
+    const { globalThis } = await import("global");
+    const Bun = (globalThis as any).Bun;
+    if (Bun?.password?.verify) {
+      return await Bun.password.verify(codigo, hash);
+    }
+    return codigo === hash;
   } catch {
     return false;
   }
 }
 
 async function obtenerTecnicosPorCodigo(codigoNormalizado: string) {
-  try {
-    return await sql<UsuarioLogin[]>`
-      SELECT id, nombre, correo, rol, activo, codigo_acceso, hash_codigo_acceso, fecha_limite, estado_corte
-      FROM usuarios
-      WHERE activo = true
-        AND LOWER(COALESCE(rol, '')) = 'tecnico'
-        AND (
-          codigo_acceso = ${codigoNormalizado}
-          OR hash_codigo_acceso IS NOT NULL
-        )
-      ORDER BY updated_at DESC, created_at DESC
-    `;
-  } catch (error) {
-    if ((error as { code?: string })?.code !== "42703") {
-      throw error;
-    }
-  }
-
-  try {
-    return await sql<UsuarioLogin[]>`
-      SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso, fecha_limite, estado_corte
-      FROM usuarios
-      WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
-        AND (
-          codigo_acceso = ${codigoNormalizado}
-          OR hash_codigo_acceso IS NOT NULL
-        )
-      ORDER BY updated_at DESC, created_at DESC
-    `;
-  } catch (error) {
-    if ((error as { code?: string })?.code !== "42703") {
-      throw error;
-    }
-  }
-
-  try {
-    return await sql<UsuarioLogin[]>`
-      SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso, estado_corte
-      FROM usuarios
-      WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
-        AND (
-          codigo_acceso = ${codigoNormalizado}
-          OR hash_codigo_acceso IS NOT NULL
-        )
-      ORDER BY updated_at DESC, created_at DESC
-    `;
-  } catch (error) {
-    if ((error as { code?: string })?.code !== "42703") {
-      throw error;
-    }
-  }
-
-  try {
-    return await sql<UsuarioLogin[]>`
-      SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso
-      FROM usuarios
-      WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
-        AND (
-          codigo_acceso = ${codigoNormalizado}
-          OR hash_codigo_acceso IS NOT NULL
-        )
-      ORDER BY updated_at DESC, created_at DESC
-    `;
-  } catch (error) {
-    if ((error as { code?: string })?.code !== "42703") {
-      throw error;
-    }
-  }
-
-  try {
-    return await sql<UsuarioLogin[]>`
-      SELECT id, nombre, correo, rol, activo, codigo_acceso, hash_codigo_acceso, fecha_limite, estado_corte
-      FROM usuarios
-      WHERE activo = true
-        AND LOWER(COALESCE(rol, '')) = 'tecnico'
-        AND (
-          codigo_acceso = ${codigoNormalizado}
-          OR hash_codigo_acceso IS NOT NULL
-        )
-    `;
-  } catch (error) {
-    if ((error as { code?: string })?.code !== "42703") {
-      throw error;
-    }
-  }
-
-  try {
-    return await sql<UsuarioLogin[]>`
-      SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso, fecha_limite, estado_corte
-      FROM usuarios
-      WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
-        AND (
-          codigo_acceso = ${codigoNormalizado}
-          OR hash_codigo_acceso IS NOT NULL
-        )
-    `;
-  } catch (error) {
-    if ((error as { code?: string })?.code !== "42703") {
-      throw error;
-    }
-  }
-
-  try {
-    return await sql<UsuarioLogin[]>`
-      SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso, estado_corte
-      FROM usuarios
-      WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
-        AND (
-          codigo_acceso = ${codigoNormalizado}
-          OR hash_codigo_acceso IS NOT NULL
-        )
-    `;
-  } catch (error) {
-    if ((error as { code?: string })?.code !== "42703") {
-      throw error;
-    }
-  }
-
-  return await sql<UsuarioLogin[]>`
-    SELECT id, nombre, correo, rol, codigo_acceso, hash_codigo_acceso
+  console.log("[auth] Buscando tecnico con codigo:", codigoNormalizado);
+  
+  const tecnicos = await sql<UsuarioLogin[]>`
+    SELECT id, nombre, correo, rol, activo, codigo_acceso, hash_codigo_acceso, fecha_limite, estado_corte
     FROM usuarios
-    WHERE LOWER(COALESCE(rol, '')) = 'tecnico'
+    WHERE LOWER(rol) = 'tecnico'
       AND (
         codigo_acceso = ${codigoNormalizado}
         OR hash_codigo_acceso IS NOT NULL
       )
+    LIMIT 10
   `;
+  
+  console.log("[auth] Tecnicos encontrados:", tecnicos?.length ?? 0);
+  return tecnicos ?? [];
 }
 
 async function registrarAuthLog(
@@ -190,25 +83,38 @@ async function registrarAuthLog(
 
 export async function loginTecnico(codigo: string, ip?: string, userAgent?: string) {
   const codigoNormalizado = normalizarCodigo(codigo);
+  console.log("[login] Intentando login con codigo:", codigoNormalizado);
 
   const tecnicos = await obtenerTecnicosPorCodigo(codigoNormalizado);
 
-  let tecnico =
-    tecnicos.find((usuario) => usuario.codigo_acceso === codigoNormalizado && rolEsTecnico(usuario.rol)) ??
-    null;
-
-  if (!tecnico) {
-    for (const candidato of tecnicos) {
-      if (!rolEsTecnico(candidato.rol)) continue;
-      if (await codigoCoincideConHash(codigoNormalizado, candidato.hash_codigo_acceso)) {
-        tecnico = candidato;
-        break;
-      }
+  let tecnico = null;
+  
+  for (const candidato of tecnicos) {
+    console.log("[login] Verificando candidato:", candidato.id, "rol:", candidato.rol, "hasCode:", !!candidato.codigo_acceso, "hasHash:", !!candidato.hash_codigo_acceso);
+    
+    if (candidato.codigo_acceso === codigoNormalizado) {
+      console.log("[login] Codigo exacto coincide");
+      tecnico = candidato;
+      break;
+    }
+    
+    if (candidato.hash_codigo_acceso && await codigoCoincideConHash(codigoNormalizado, candidato.hash_codigo_acceso)) {
+      console.log("[login] Hash coincide");
+      tecnico = candidato;
+      break;
     }
   }
 
   if (!tecnico) {
+    console.log("[login] Ningun tecnico coincide");
     return { success: false, error: "Código inválido o expirado" };
+  }
+
+  console.log("[login] Tecnico encontrado:", tecnico.nombre, "id:", tecnico.id, "activo:", tecnico.activo);
+
+  if (tecnico.activo === false || tecnico.activo === null || tecnico.activo === 'false') {
+    console.log("[login] Usuario inactivo o nulo");
+    return { success: false, error: "usuario_inactivo" };
   }
 
   const fechaLimiteVencida = tecnico.fecha_limite
@@ -217,10 +123,12 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
   const corteAplicado = tieneCorteActivo(tecnico.estado_corte);
 
   if (fechaLimiteVencida || corteAplicado) {
+    console.log("[login] Periodo vencido o corte activo");
     return { success: false, error: "periodo_vencido" };
   }
 
   const token = await signJwt({ sub: tecnico.id, nombre: tecnico.nombre, rol: "tecnico" });
+  console.log("[login] Token generado:", token.slice(0, 20) + "...");
 
   try {
     await redis.setex(
@@ -232,6 +140,7 @@ export async function loginTecnico(codigo: string, ip?: string, userAgent?: stri
         rol: "tecnico",
       })
     );
+    console.log("[login] Sesion guardada en Redis");
   } catch (error) {
     console.error("[auth] No se pudo guardar la sesión en Redis:", error);
   }

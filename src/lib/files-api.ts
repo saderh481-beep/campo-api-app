@@ -1,10 +1,7 @@
-import { env } from "@/config/env";
+import { env } from "../config/env";
 
-const FILES_API_URL =
-  env.FILES_API_URL?.trim() ||
-  env.CAMPO_FILES_API_URL?.trim() ||
-  "https://campo-api-files-campo-saas.up.railway.app";
-const FILES_API_KEY_APP = env.FILES_API_KEY_APP?.trim();
+const FILES_API_URL = env.CAMPO_FILES_API_URL || env.FILES_API_URL || "https://campo-api-files-campo-saas.up.railway.app";
+const FILES_API_KEY_APP = env.API_KEY_APP || env.FILES_API_KEY_APP;
 
 interface UploadResult {
   success: boolean;
@@ -197,6 +194,39 @@ export async function uploadFotoRostroFromBase64(bitacoraId: string, base64Data:
     return await uploadFotoRostro(bitacoraId, buffer, filename, mimeType);
   } catch (err) {
     console.error("[files-api] Error procesando foto rostro base64:", err);
+    return { success: false, error: err instanceof Error ? err.message : "Error desconocido" };
+  }
+}
+
+export async function uploadFotosCampoFromBase64(bitacoraId: string, tecnicoId: string, base64Array: string[]): Promise<FotoCampoResult> {
+  try {
+    const buffers: Buffer[] = [];
+    const filenames: string[] = [];
+
+    for (let i = 0; i < base64Array.length; i++) {
+      const base64Data = base64Array[i];
+      const base64Match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+      if (!base64Match) {
+        console.warn(`[files-api] Fotos campo: formato inválido en índice ${i},saltando`);
+        continue;
+      }
+
+      const mimeType = base64Match[1];
+      const base64 = base64Match[2];
+      const buffer = Buffer.from(base64, "base64");
+      const extension = mimeType.includes("png") ? "png" : "jpg";
+      
+      buffers.push(buffer);
+      filenames.push(`campo_${Date.now()}_${i}.${extension}`);
+    }
+
+    if (buffers.length === 0) {
+      return { success: false, error: "No hay imágenes válidas para procesar" };
+    }
+
+    return await uploadFotosCampo(bitacoraId, tecnicoId, buffers, filenames);
+  } catch (err) {
+    console.error("[files-api] Error procesando fotos campo base64:", err);
     return { success: false, error: err instanceof Error ? err.message : "Error desconocido" };
   }
 }

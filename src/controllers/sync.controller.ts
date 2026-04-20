@@ -4,7 +4,8 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { authMiddleware } from "@/middleware/auth";
 import type { JwtPayload } from "@/lib/jwt";
-import { sincronizarOperaciones, obtenerDeltaSync } from "@/services/sync.service";
+import { sql } from "@/db";
+import { sincronizarOperaciones, obtenerDeltaSync, obtenerBitacorasPendientesSync, sincronizarBitacorasOffline } from "@/services/sync.service";
 
 const app = new Hono<{
   Variables: {
@@ -146,6 +147,8 @@ app.post(
     const tecnico = c.get("tecnico");
     const { operaciones } = c.req.valid("json");
 
+    console.log("[sync] tecnico:", tecnico.sub, "operaciones:", operaciones?.length);
+    
     const resultado = await sincronizarOperaciones(tecnico.sub, operaciones);
     return c.json(resultado);
   }
@@ -155,19 +158,8 @@ app.get("/sync/delta", async (c) => {
   const tecnico = c.get("tecnico");
   const ultimoSync = c.req.query("ultimo_sync");
 
-  if (!ultimoSync) {
-    return c.json({
-      sync_ts: new Date().toISOString(),
-      beneficiarios: [],
-      actividades: [],
-      cadenas: [],
-      localidades: [],
-      bitacoras: [],
-      asignaciones: { beneficiarios: [], actividades: [] },
-      message: "Primera sincronización - no hay datos locales"
-    });
-  }
-
+  console.log("[sync/delta] tecnico:", tecnico.sub, "ultimoSync:", ultimoSync);
+  
   const resultado = await obtenerDeltaSync(tecnico.sub, ultimoSync);
 
   if ("error" in resultado) {
@@ -178,6 +170,35 @@ app.get("/sync/delta", async (c) => {
     }, 400);
   }
 
+  console.log("[sync/delta] Resultado - beneficiarios:", resultado.beneficiarios?.length, "bitacoras:", resultado.bitacoras?.length, "asignaciones:", resultado.asignaciones?.beneficiarios?.length);
+  
+  return c.json(resultado);
+});
+
+app.get("/sync/debug", async (c) => {
+  const tecnico = c.get("tecnico");
+  
+  const [bitacorasCount] = await sql.unsafe(`SELECT COUNT(*)::int as total FROM bitacoras WHERE tecnico_id = $1`, [tecnico.sub]);
+  const [asignacionesBenCount] = await sql.unsafe(`SELECT COUNT(*)::int as total FROM asignaciones_beneficiario WHERE tecnico_id = $1 AND activo = true`, [tecnico.sub]);
+  const [asignacionesActCount] = await sql.unsafe(`SELECT COUNT(*)::int as total FROM asignaciones_actividad WHERE tecnico_id = $1 AND activo = true`, [tecnico.sub]);
+  
+  return c.json({
+    tecnico_id: tecnico.sub,
+    bitacoras_total: bitacorasCount?.total ?? 0,
+    asignaciones_beneficiarios: asignacionesBenCount?.total ?? 0,
+    asignaciones_actividades: asignacionesActCount?.total ?? 0,
+  });
+});
+
+app.post("/sync/sincronizar-offline", async (c) => {
+  const tecnico = c.get("tecnico");
+  const body = await c.req.json<{ sync_ids: string[] }>();
+  
+  if (!body.sync_ids || !Array.isArray(body.sync_ids)) {
+    return c.json({ error: "sync_ids requerido" }, 400);
+  }
+  
+  const resultado = await sincronizarBitacorasOffline(tecnico.sub, body.sync_ids);
   return c.json(resultado);
 });
 
