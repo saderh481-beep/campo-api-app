@@ -1,15 +1,11 @@
 import { Redis } from "ioredis";
-import { env, requireEnv } from "@/config/env";
+import { env, getRedisUrl } from "@/config/env";
 
 let redisClient: Redis | null = null;
 let redisDisabledReason: string | null = null;
 
-function getRedisUrl() {
-  if (env.NODE_ENV === "production") {
-    return requireEnv("REDIS_URL");
-  }
-
-  return env.REDIS_PUBLIC_URL?.trim() || requireEnv("REDIS_URL");
+function createRedisUrl() {
+  return getRedisUrl();
 }
 
 function normalizeRedisUrl(url: string) {
@@ -33,7 +29,7 @@ function getRedisClient() {
   if (redisDisabledReason) return null;
   if (!redisClient) {
     try {
-      const redisUrl = normalizeRedisUrl(getRedisUrl());
+      const redisUrl = normalizeRedisUrl(createRedisUrl());
       redisClient = new Redis(redisUrl, {
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,

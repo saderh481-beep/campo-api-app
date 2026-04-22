@@ -1,5 +1,5 @@
 import postgres from "postgres";
-import { requireEnv } from "@/config/env";
+import { getDatabaseUrl } from "@/config/env";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
@@ -8,7 +8,7 @@ let sqlClient: ReturnType<typeof postgres> | null = null;
 let connectionError: Error | null = null;
 
 function createSqlClient(): ReturnType<typeof postgres> {
-  const databaseUrl = requireEnv("DATABASE_URL");
+  const databaseUrl = getDatabaseUrl();
   
   return postgres(databaseUrl, {
     max: 20,

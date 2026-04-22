@@ -20,6 +20,8 @@ const envSchema = z
     JWT_SECRET: z.string().optional(),
     REDIS_URL: z.string().optional(),
     REDIS_PUBLIC_URL: z.string().optional(),
+    DATABASE_PUBLIC_URL: z.string().optional(),
+    RAILWAY_INTERNAL_URL: z.string().optional(),
     CLOUDINARY_CLOUD_NAME: z.string().optional(),
     CLOUDINARY_API_KEY: z.string().optional(),
     CLOUDINARY_API_SECRET: z.string().optional(),
@@ -33,7 +35,6 @@ const envSchema = z
     CAMPO_FILES_API_URL: z.string().optional(),
     API_KEY_APP: z.string().optional(),
     FILES_API_URL: z.string().optional(),
-    CAMPO_FILES_API_URL: z.string().optional(),
     FILES_API_KEY_APP: z.string().optional(),
   })
   .refine(
@@ -66,7 +67,22 @@ export const env = {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
+  isRailway: Boolean(parsedEnv.data.RAILWAY_INTERNAL_URL || process.env.RAILWAY_PROJECT_NAME || process.env.RAILWAY_SERVICE_NAME),
 } as const;
+
+export function getDatabaseUrl(): string {
+  const dbUrl = parsedEnv.data.DATABASE_URL;
+  if (!dbUrl) throw new Error("[api-app] DATABASE_URL no configurado");
+  
+  return dbUrl;
+}
+
+export function getRedisUrl(): string {
+  const redisUrl = parsedEnv.data.REDIS_URL;
+  if (!redisUrl) throw new Error("[api-app] REDIS_URL no configurado");
+  
+  return redisUrl;
+}
 
 export function requireEnv(name: keyof typeof env, options?: { minLength?: number }) {
   const rawValue = env[name];
