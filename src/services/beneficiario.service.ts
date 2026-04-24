@@ -142,7 +142,7 @@ export async function obtenerAsignacionesTecnicoParaApp(tecnicoId: string) {
 export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
   try {
     return await sql<BeneficiarioConCadenas[]>`
-      SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
+      SELECT DISTINCT ON (b.id) b.id, b.nombre, b.curp, b.folio_saderh, b.municipio, b.localidad, b.direccion, b.cp,
              b.telefono_principal, b.telefono_secundario,
              CASE
                WHEN b.coord_parcela IS NULL THEN NULL
@@ -171,7 +171,7 @@ export async function obtenerBeneficiariosTecnico(tecnicoId: string) {
   }
 
   return await sql<BeneficiarioConCadenas[]>`
-    SELECT DISTINCT ON (b.id) b.id, b.nombre, b.municipio, b.localidad, b.direccion, b.cp,
+    SELECT DISTINCT ON (b.id) b.id, b.nombre, b.curp, b.folio_saderh, b.municipio, b.localidad, b.direccion, b.cp,
            b.telefono_principal, b.telefono_secundario,
            CASE
              WHEN b.coord_parcela IS NULL THEN NULL
@@ -217,6 +217,7 @@ export async function obtenerBeneficiariosTecnicoParaApp(tecnicoId: string) {
   return {
     success: true,
     id_tecnico: tecnicoId,
+    beneficiarios: items,
     beneficiaries: items,
     total: items.length,
   };
@@ -298,6 +299,7 @@ export async function obtenerBeneficiariosTecnicoPaginado(
   return {
     success: true,
     id_tecnico: tecnicoId,
+    beneficiarios: items,
     beneficiaries: items,
     total,
     limit,

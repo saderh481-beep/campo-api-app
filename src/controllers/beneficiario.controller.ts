@@ -40,11 +40,13 @@ app.get("/asignaciones", async (c) => {
 
 app.get("/mis-beneficiarios", async (c) => {
   const tecnico = c.get("tecnico");
-  const limit = parseInt(c.req.query("limit") || "50");
-  const offset = parseInt(c.req.query("offset") || "0");
+  const limitQuery = c.req.query("limit");
+  const offsetQuery = c.req.query("offset");
   const buscar = c.req.query("buscar") || undefined;
+  const limit = parseInt(limitQuery || "50");
+  const offset = parseInt(offsetQuery || "0");
   
-  if (limit > 0 || offset > 0 || buscar) {
+  if (limitQuery !== undefined || offsetQuery !== undefined || buscar) {
     const result = await obtenerBeneficiariosTecnicoPaginado(tecnico.sub, { limit, offset, buscar });
     return c.json(result);
   }

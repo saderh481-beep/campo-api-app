@@ -495,7 +495,7 @@ esPrimeraSync
         WHERE activo = true AND updated_at > ${desde.toISOString()}
         ORDER BY municipio, nombre
       `,
-esPrimeraSync
+    esPrimeraSync
       ? sql`
         SELECT b.id, b.sync_id, b.tipo, b.estado, b.fecha_inicio, b.fecha_fin, 
                b.coord_inicio, b.coord_fin, b.beneficiario_id, b.actividad_id,
@@ -527,7 +527,39 @@ esPrimeraSync
           AND b.updated_at > ${desde.toISOString()}
         ORDER BY b.updated_at ASC
       `,
-esPrimeraSync
+    esPrimeraSync
+      ? sql`
+        SELECT
+          ab.id,
+          ab.tecnico_id,
+          ab.beneficiario_id,
+          ab.activo,
+          ab.asignado_por,
+          ab.asignado_en,
+          ab.removido_en
+        FROM asignaciones_beneficiario ab
+        WHERE ab.tecnico_id = ${tecnicoId}
+          AND ab.activo = true
+        ORDER BY ab.asignado_en ASC
+      `
+      : sql`
+        SELECT
+          ab.id,
+          ab.tecnico_id,
+          ab.beneficiario_id,
+          ab.activo,
+          ab.asignado_por,
+          ab.asignado_en,
+          ab.removido_en
+        FROM asignaciones_beneficiario ab
+        WHERE ab.tecnico_id = ${tecnicoId}
+          AND GREATEST(
+            COALESCE(ab.asignado_en, TIMESTAMP 'epoch'),
+            COALESCE(ab.removido_en, TIMESTAMP 'epoch')
+          ) > ${desde.toISOString()}
+        ORDER BY ab.asignado_en ASC
+      `,
+	esPrimeraSync
       ? sql`
         SELECT
           aa.id,
