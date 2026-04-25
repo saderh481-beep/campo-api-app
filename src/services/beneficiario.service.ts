@@ -70,17 +70,74 @@ function cadenaPrincipal(beneficiario: BeneficiarioConCadenas) {
 }
 
 export async function obtenerAsignacionesTecnicoParaApp(tecnicoId: string) {
-  const [asignaciones, beneficiarios] = await Promise.all([
+  const [asignaciones, beneficiarios, bitacorasBeneficiario, bitacorasActividad] = await Promise.all([
     obtenerAsignacionesTecnico(tecnicoId),
     obtenerBeneficiariosTecnico(tecnicoId),
+    sql<
+      {
+        id: string;
+        beneficiario_id: string;
+        tipo: string;
+        estado: string;
+        fecha_inicio: string;
+        fecha_fin: string | null;
+        updated_at: string;
+      }[]
+    >`
+      SELECT DISTINCT ON (b.beneficiario_id)
+        b.id,
+        b.beneficiario_id,
+        b.tipo,
+        b.estado,
+        b.fecha_inicio,
+        b.fecha_fin,
+        b.updated_at
+      FROM bitacoras b
+      WHERE b.tecnico_id = ${tecnicoId}
+        AND b.tipo = 'beneficiario'
+        AND b.beneficiario_id IS NOT NULL
+      ORDER BY b.beneficiario_id, b.fecha_inicio DESC, b.updated_at DESC
+    `,
+    sql<
+      {
+        id: string;
+        actividad_id: string;
+        tipo: string;
+        estado: string;
+        fecha_inicio: string;
+        fecha_fin: string | null;
+        updated_at: string;
+      }[]
+    >`
+      SELECT DISTINCT ON (b.actividad_id)
+        b.id,
+        b.actividad_id,
+        b.tipo,
+        b.estado,
+        b.fecha_inicio,
+        b.fecha_fin,
+        b.updated_at
+      FROM bitacoras b
+      WHERE b.tecnico_id = ${tecnicoId}
+        AND b.tipo = 'actividad'
+        AND b.actividad_id IS NOT NULL
+      ORDER BY b.actividad_id, b.fecha_inicio DESC, b.updated_at DESC
+    `,
   ]);
 
   const beneficiariosMap = new Map(
     beneficiarios.map((beneficiario) => [beneficiario.id, beneficiario] as const)
   );
+  const bitacorasBeneficiarioMap = new Map(
+    bitacorasBeneficiario.map((bitacora) => [bitacora.beneficiario_id, bitacora] as const)
+  );
+  const bitacorasActividadMap = new Map(
+    bitacorasActividad.map((bitacora) => [bitacora.actividad_id, bitacora] as const)
+  );
 
   const beneficiarioItems = asignaciones.beneficiarios.map((item) => {
     const beneficiario = beneficiariosMap.get(item.beneficiario_id);
+    const ultimaBitacora = bitacorasBeneficiarioMap.get(item.beneficiario_id) ?? null;
 
     return {
       id: item.id,
@@ -97,6 +154,8 @@ export async function obtenerAsignacionesTecnicoParaApp(tecnicoId: string) {
       created_by: item.asignado_por,
       created_at: item.asignado_en,
       updated_at: item.removido_en ?? item.asignado_en,
+      puede_iniciar_bitacora: true,
+      ultima_bitacora: ultimaBitacora,
       beneficiario: {
         id: item.beneficiario_id,
         id_beneficiario: item.beneficiario_id,
@@ -111,23 +170,29 @@ export async function obtenerAsignacionesTecnicoParaApp(tecnicoId: string) {
     };
   });
 
-  const actividadItems = asignaciones.actividades.map((item) => ({
-    id: item.id,
-    id_asignacion: item.id,
-    id_tecnico: item.tecnico_id,
-    tipo_asignacion: "actividad",
-    nombre: item.actividad_nombre,
-    descripcion: item.actividad_descripcion,
-    descripcion_actividad: item.actividad_descripcion,
-    prioridad: "MEDIA",
-    fecha_limite: null,
-    completado: false,
-    activo: item.activo,
-    created_by: item.asignado_por,
-    created_at: item.asignado_en,
-    updated_at: item.removido_en ?? item.asignado_en,
-    beneficiario: null,
-  }));
+  const actividadItems = asignaciones.actividades.map((item) => {
+    const ultimaBitacora = bitacorasActividadMap.get(item.actividad_id) ?? null;
+
+    return {
+      id: item.id,
+      id_asignacion: item.id,
+      id_tecnico: item.tecnico_id,
+      tipo_asignacion: "actividad",
+      nombre: item.actividad_nombre,
+      descripcion: item.actividad_descripcion,
+      descripcion_actividad: item.actividad_descripcion,
+      prioridad: "MEDIA",
+      fecha_limite: null,
+      completado: false,
+      activo: item.activo,
+      created_by: item.asignado_por,
+      created_at: item.asignado_en,
+      updated_at: item.removido_en ?? item.asignado_en,
+      puede_iniciar_bitacora: true,
+      ultima_bitacora: ultimaBitacora,
+      beneficiario: null,
+    };
+  });
 
   const items = [...actividadItems, ...beneficiarioItems];
 
