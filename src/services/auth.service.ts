@@ -16,7 +16,7 @@ function rolEsTecnico(rol: string | null | undefined) {
 
 function tieneCorteActivo(estadoCorte: string | null | undefined) {
   const estado = (estadoCorte ?? "").trim().toLowerCase();
-  return estado !== "" && estado !== "en_servicio" && estado !== "activo";
+  return estado !== "en_servicio";
 }
 
 async function codigoCoincideConHash(codigo: string, hash: string | null) {

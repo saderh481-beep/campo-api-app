@@ -94,7 +94,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
     : false;
 
   const estadoCorte = (tecnicoActual.estado_corte ?? "").trim().toLowerCase();
-  const corteAplicado = estadoCorte !== "" && estadoCorte !== "en_servicio" && estadoCorte !== "activo";
+  const corteAplicado = estadoCorte !== "en_servicio";
 
   console.log("[auth] fecha_limite:", tecnicoActual.fecha_limite, "vencida:", fechaLimiteVencida);
   console.log("[auth] estado_corte:", tecnicoActual.estado_corte, "corteAplicado:", corteAplicado);

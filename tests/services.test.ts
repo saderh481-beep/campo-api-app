@@ -27,12 +27,12 @@ describe("Auth Service", () => {
   test("tieneCorteActivo debe identificar estados de corte", () => {
     const tieneCorte = (estadoCorte: string | null | undefined) => {
       const estado = (estadoCorte ?? "").trim().toLowerCase();
-      return estado !== "" && estado !== "en_servicio" && estado !== "activo";
+      return estado !== "en_servicio";
     };
-    
+
     expect(tieneCorte("en_servicio")).toBe(false);
-    expect(tieneCorte("activo")).toBe(false);
-    expect(tieneCorte("")).toBe(false);
+    expect(tieneCorte("activo")).toBe(true);
+    expect(tieneCorte("")).toBe(true);
     expect(tieneCorte("corte")).toBe(true);
     expect(tieneCorte("suspendido")).toBe(true);
   });
