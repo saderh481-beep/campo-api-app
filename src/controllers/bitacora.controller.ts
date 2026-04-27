@@ -94,8 +94,20 @@ app.get("/beneficiario/:beneficiarioId", async (c) => {
   const tecnico = c.get("tecnico");
   const { beneficiarioId } = c.req.param();
 
+  // Verificar que el técnico esté asignado a este beneficiario
+  const [asignacion] = await sql`
+    SELECT id FROM asignaciones_beneficiario
+    WHERE tecnico_id = ${tecnico.sub}
+      AND beneficiario_id = ${beneficiarioId}
+      AND activo = true
+  `;
+
+  if (!asignacion) {
+    return c.json({ error: "No tienes asignación activa para este beneficiario" }, 403);
+  }
+
   const bitacoras = await sql`
-    SELECT 
+    SELECT
       id, sync_id, tipo, estado, fecha_inicio, fecha_fin,
       coord_inicio, coord_fin,
       actividades_desc, recomendaciones, comentarios_beneficiario,
@@ -105,6 +117,39 @@ app.get("/beneficiario/:beneficiarioId", async (c) => {
     FROM bitacoras
     WHERE tecnico_id = ${tecnico.sub}
       AND beneficiario_id = ${beneficiarioId}
+    ORDER BY fecha_inicio DESC
+  `;
+
+  return c.json(bitacoras);
+});
+
+app.get("/actividad/:actividadId", async (c) => {
+  const tecnico = c.get("tecnico");
+  const { actividadId } = c.req.param();
+
+  // Verificar que el técnico esté asignado a esta actividad
+  const [asignacion] = await sql`
+    SELECT id FROM asignaciones_actividad
+    WHERE tecnico_id = ${tecnico.sub}
+      AND actividad_id = ${actividadId}
+      AND activo = true
+  `;
+
+  if (!asignacion) {
+    return c.json({ error: "No tienes asignación activa para esta actividad" }, 403);
+  }
+
+  const bitacoras = await sql`
+    SELECT
+      id, sync_id, tipo, estado, fecha_inicio, fecha_fin,
+      coord_inicio, coord_fin,
+      actividades_desc, recomendaciones, comentarios_beneficiario,
+      coordinacion_interinst, instancia_coordinada, proposito_coordinacion,
+      observaciones_coordinador, foto_rostro_url, firma_url, fotos_campo,
+      calificacion, reporte, datos_extendidos, created_at, updated_at
+    FROM bitacoras
+    WHERE tecnico_id = ${tecnico.sub}
+      AND actividad_id = ${actividadId}
     ORDER BY fecha_inicio DESC
   `;
 

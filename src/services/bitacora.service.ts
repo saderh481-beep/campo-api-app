@@ -11,6 +11,30 @@ import { generarPdfBitacora } from "@/lib/pdf";
 import type { Bitacora, BitacoraResumen } from "@/models";
 import { publishUpdate, CHANNELS } from "./pubsub.service";
 
+async function validarAsignacionTecnico(tecnicoId: string, tipo: string, beneficiarioId?: string, actividadId?: string) {
+  if (tipo === "beneficiario" && beneficiarioId) {
+    const [asignacion] = await sql`
+      SELECT id FROM asignaciones_beneficiario
+      WHERE tecnico_id = ${tecnicoId}
+        AND beneficiario_id = ${beneficiarioId}
+        AND activo = true
+    `;
+    if (!asignacion) {
+      throw new Error("No tienes asignación activa para este beneficiario");
+    }
+  } else if (tipo === "actividad" && actividadId) {
+    const [asignacion] = await sql`
+      SELECT id FROM asignaciones_actividad
+      WHERE tecnico_id = ${tecnicoId}
+        AND actividad_id = ${actividadId}
+        AND activo = true
+    `;
+    if (!asignacion) {
+      throw new Error("No tienes asignación activa para esta actividad");
+    }
+  }
+}
+
 export async function crearBitacora(
   tecnicoId: string,
   data: {
@@ -34,8 +58,15 @@ export async function crearBitacora(
     creada_offline?: boolean;
   }
 ) {
+  // Validar que el técnico tenga asignación activa para el beneficiario o actividad
+  try {
+    await validarAsignacionTecnico(tecnicoId, data.tipo, data.beneficiario_id, data.actividad_id);
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+
   const providedSyncId = data.sync_id;
-  const syncId = providedSyncId 
+  const syncId = providedSyncId
     ? (() => {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const offlineRegex = /^offline-\d+-[a-z0-9]+$/i;
@@ -96,6 +127,24 @@ export async function crearBitacora(
   return nueva;
 }
 
+async function obtenerAsignacionesTecnico(tecnicoId: string) {
+  const [beneficiariosAsignados, actividadesAsignadas] = await Promise.all([
+    sql<{ beneficiario_id: string }[]>`
+      SELECT beneficiario_id FROM asignaciones_beneficiario
+      WHERE tecnico_id = ${tecnicoId} AND activo = true
+    `,
+    sql<{ actividad_id: string }[]>`
+      SELECT actividad_id FROM asignaciones_actividad
+      WHERE tecnico_id = ${tecnicoId} AND activo = true
+    `
+  ]);
+
+  return {
+    beneficiarios: beneficiariosAsignados.map(a => a.beneficiario_id),
+    actividades: actividadesAsignadas.map(a => a.actividad_id)
+  };
+}
+
 export async function obtenerBitacorasTecnico(
   tecnicoId: string,
   options: { limit?: number; offset?: number; estado?: string } = {}
@@ -104,25 +153,45 @@ export async function obtenerBitacorasTecnico(
 
   console.log("[obtenerBitacorasTecnico] tecnicoId:", tecnicoId, "estado:", estado, "limit:", limit, "offset:", offset);
 
+  // Obtener asignaciones del técnico
+  const asignaciones = await obtenerAsignacionesTecnico(tecnicoId);
+
+  console.log("[obtenerBitacorasTecnico] asignaciones - beneficiarios:", asignaciones.beneficiarios.length, "actividades:", asignaciones.actividades.length);
+
+  // Si no tiene asignaciones, retornar array vacío
+  if (asignaciones.beneficiarios.length === 0 && asignaciones.actividades.length === 0) {
+    console.log("[obtenerBitacorasTecnico] No tiene asignaciones activas");
+    return [];
+  }
+
   let bitacoras;
-  
+
+  // Construir condición WHERE para filtrar por asignaciones
+  const asignacionesCondition = `
+    AND (
+      (b.tipo = 'beneficiario' AND b.beneficiario_id = ANY(${JSON.stringify(asignaciones.beneficiarios)}::uuid[]))
+      OR
+      (b.tipo = 'actividad' AND b.actividad_id = ANY(${JSON.stringify(asignaciones.actividades)}::uuid[]))
+    )
+  `;
+
   const baseQuery = estado
-    ? `SELECT b.*, 
-        ben.nombre as beneficiario_nombre, 
+    ? `SELECT b.*,
+        ben.nombre as beneficiario_nombre,
         act.nombre as actividad_nombre
       FROM bitacoras b
       LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
       LEFT JOIN actividades act ON b.actividad_id = act.id
-      WHERE b.tecnico_id = $1 AND b.estado = $2
+      WHERE b.tecnico_id = $1 AND b.estado = $2 ${asignacionesCondition}
       ORDER BY b.fecha_inicio DESC
       LIMIT $3 OFFSET $4`
-    : `SELECT b.*, 
-        ben.nombre as beneficiario_nombre, 
+    : `SELECT b.*,
+        ben.nombre as beneficiario_nombre,
         act.nombre as actividad_nombre
       FROM bitacoras b
       LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
       LEFT JOIN actividades act ON b.actividad_id = act.id
-      WHERE b.tecnico_id = $1
+      WHERE b.tecnico_id = $1 ${asignacionesCondition}
       ORDER BY b.fecha_inicio DESC
       LIMIT $2 OFFSET $3`;
 
