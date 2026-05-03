@@ -166,12 +166,13 @@ export async function obtenerBitacorasTecnico(
 
   let bitacoras;
 
-  // Construir condición WHERE para filtrar por asignaciones
+  // Filtrar por las asignaciones activas del técnico usando parámetros,
+  // no interpolación de JSON dentro del SQL.
   const asignacionesCondition = `
     AND (
-      (b.tipo = 'beneficiario' AND b.beneficiario_id = ANY(${JSON.stringify(asignaciones.beneficiarios)}::uuid[]))
+      (b.tipo = 'beneficiario' AND b.beneficiario_id = ANY($2::uuid[]))
       OR
-      (b.tipo = 'actividad' AND b.actividad_id = ANY(${JSON.stringify(asignaciones.actividades)}::uuid[]))
+      (b.tipo = 'actividad' AND b.actividad_id = ANY($3::uuid[]))
     )
   `;
 
@@ -182,9 +183,9 @@ export async function obtenerBitacorasTecnico(
       FROM bitacoras b
       LEFT JOIN beneficiarios ben ON b.beneficiario_id = ben.id
       LEFT JOIN actividades act ON b.actividad_id = act.id
-      WHERE b.tecnico_id = $1 AND b.estado = $2 ${asignacionesCondition}
+      WHERE b.tecnico_id = $1 AND b.estado = $4 ${asignacionesCondition}
       ORDER BY b.fecha_inicio DESC
-      LIMIT $3 OFFSET $4`
+      LIMIT $5 OFFSET $6`
     : `SELECT b.*,
         ben.nombre as beneficiario_nombre,
         act.nombre as actividad_nombre
@@ -193,12 +194,25 @@ export async function obtenerBitacorasTecnico(
       LEFT JOIN actividades act ON b.actividad_id = act.id
       WHERE b.tecnico_id = $1 ${asignacionesCondition}
       ORDER BY b.fecha_inicio DESC
-      LIMIT $2 OFFSET $3`;
+      LIMIT $4 OFFSET $5`;
 
   if (estado) {
-    bitacoras = await sql.unsafe(baseQuery, [tecnicoId, estado, limit, offset]);
+    bitacoras = await sql.unsafe(baseQuery, [
+      tecnicoId,
+      asignaciones.beneficiarios,
+      asignaciones.actividades,
+      estado,
+      limit,
+      offset,
+    ]);
   } else {
-    bitacoras = await sql.unsafe(baseQuery, [tecnicoId, limit, offset]);
+    bitacoras = await sql.unsafe(baseQuery, [
+      tecnicoId,
+      asignaciones.beneficiarios,
+      asignaciones.actividades,
+      limit,
+      offset,
+    ]);
   }
 
   console.log("[obtenerBitacorasTecnico] Query ejecutada, bitacoras.length:", bitacoras?.length ?? 0);
